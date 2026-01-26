@@ -1,4 +1,4 @@
-import { classificationPrefixes, naicsPrefixes, validCountries } from "./globals.js";
+import { classificationPrefixes, naicsPrefixes, validCountries, industryDayTitleKeywords, solicitationTitleKeywords } from "./globals.js";
 
 // Check if a value starts with any of the given prefixes
 export const startsWithAny = (value, prefixes = []) => {
@@ -9,24 +9,11 @@ export const startsWithAny = (value, prefixes = []) => {
 };
 
 // Check if a title indicates an industry day or similar event
-export const titleMatchesIndustryDay = (title) => {
+export const titleMatchesKeyword = (title, keywords) => {
     if(!title) return false;
     const t = String(title).toLowerCase();
-
-    return (
-      t.includes("industry day") ||
-      t.includes("industry-day") ||
-      t.includes("outreach") ||
-      t.includes("conference") ||
-      t.includes("vendor day") ||
-      t.includes("industry engagement") ||
-      t.includes("industry briefing") ||
-      t.includes("industry forum") ||
-      t.includes("pre-solicitation conference") ||
-      t.includes("presolicitation conference") ||
-      t.includes("site visit") ||
-      t.includes("industry event")
-    );
+    const matches = keywords.some((kw) => t.includes(kw));
+    return matches;
 };
 
 export const isValidCountry = (code) => {
@@ -58,11 +45,11 @@ export const extractNaicsCodes = (item) => {
 
 };
 
-export const matchesOpportunity = (item) => {
-    const titleMatch = titleMatchesIndustryDay(item?.title);
+export const matchesOpportunityIndustryDay = (item) => {
+    const titleMatch = titleMatchesKeyword(item?.title, industryDayTitleKeywords);
 
     const countryCodes = extractCountry(item);
-    console.log("Country extracted:", countryCodes);
+    // console.log("Country extracted:", countryCodes);
     const countryMatch = countryCodes.length === 0 ? true: countryCodes.some(isValidCountry);
 
 
@@ -74,4 +61,35 @@ export const matchesOpportunity = (item) => {
     return (titleMatch || naicsMatch || classificiationMatch) && countryMatch;
 }
 
+export const matchesOpportunitySolicitation = (item) => {
+  const titleMatch = titleMatchesKeyword(
+    item?.title,
+    solicitationTitleKeywords,
+  );
+
+  const countryCodes = extractCountry(item);
+  const countryMatch =
+    countryCodes.length === 0 ? true : countryCodes.some(isValidCountry);
+
+  const naicsCodes = extractNaicsCodes(item);
+  const naicsMatch = naicsCodes.some((code) =>
+    startsWithAny(code, naicsPrefixes),
+  );
+  const classificiationMatch = startsWithAny(
+    item?.classificationCode,
+    classificationPrefixes,
+  );
+
+  // Return true if any criteria match
+  return (titleMatch || naicsMatch || classificiationMatch) && countryMatch;
+};;
+
+export const matchesOpportunityHistorical = (item) => {
+    const countryCodes = extractCountry(item);
+    const countryMatch = countryCodes.length === 0 ? true: countryCodes.some(isValidCountry);
+
+    const naicsCodes = extractNaicsCodes(item);
+    const naicsMatch = naicsCodes.some((code) => startsWithAny(code, naicsPrefixes));
+    const classificiationMatch = startsWithAny(item?.classificationCode, classificationPrefixes);
+}
 // TODO: Add Paginator utility function

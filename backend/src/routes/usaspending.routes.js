@@ -12,7 +12,7 @@ const router = express.Router();
  */
 router.post("/ping", (req, res) => {
   console.log("USASPENDING PING HIT", req.body);
-  res.json({ ok: true, body: req.body });
+  return res.status(200).json({ ok: true, body: req.body });
 });
 
 // Endpoint A: /api/v2/search/spending_by_award/
@@ -95,7 +95,7 @@ router.post("/search-award", async (req, res) => {
       },
     );
 
-    res.json({
+    return res.status(200).json({
       count: response.data.page_metadata?.total || 0,
       results: response.data.results,
     });
@@ -137,7 +137,7 @@ router.post("/search-count", async (req, res) => {
         timeout: 20000,
       }
     );
-    res.json({ response: response.data });
+    return res.status(200).json({ response: response.data });
   } catch (error) {
     console.error("USAspending API error:", error?.response?.data || error);
     res.status(500).json({
@@ -196,7 +196,7 @@ router.post("/search-category", async (req, res) => {
         timeout: 20000,
       },
     );
-    res.json({ response: response.data });
+    return res.status(200).json({ response: response.data });
   } 
  catch (error) {
     console.error("USAspending API error:", error?.response?.data || error);
@@ -220,7 +220,7 @@ router.get("/award/:award_id", async (req, res) => {
         timeout: 20000,
       },
     );
-    res.json({ response: response.data });
+    return res.status(200).json({ response: response.data });
   } catch (error) {
     console.error("USAspending API error:", error?.response?.data || error);
     res.status(500).json({
