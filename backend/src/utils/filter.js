@@ -99,6 +99,5 @@ export const matchesOpportunityHistorical = (item) => {
     const classificiationMatch = startsWithAny(item?.classificationCode, classificationPrefixes);
 
     return (titleMatch || naicsMatch || classificiationMatch) && countryMatch;
-
 }
 // TODO: Add Paginator utility function
