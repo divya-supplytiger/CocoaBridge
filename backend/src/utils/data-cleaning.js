@@ -29,7 +29,7 @@ export const normalizeSamIndustryDay = (opportunity) => {
 
   return {
     externalEventId,
-    title: opportunity.title || "No Title",
+    title: opportunity?.title || "No Title",
     source: SourceSystem.SAM,
     summary: null,
     location,
@@ -41,7 +41,7 @@ export const normalizeSamIndustryDay = (opportunity) => {
 }
 
 export const toDateOrNull = (value) => {
-    if(!value) return null;
+    if (value === null || value === undefined || value === "") return null;
     const d = new Date(value);
     return Number.isNaN(d.getTime()) ? null: d;
 };
