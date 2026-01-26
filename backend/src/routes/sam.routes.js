@@ -2,6 +2,8 @@ import express from "express";
 import axios from "axios";
 import { ENV } from "../config/env.js";
 import { matchesOpportunityIndustryDay, matchesOpportunitySolicitation, matchesOpportunityHistorical } from "../utils/filter.js";
+import { upsertIndustryDayFromSam, upsertOpportunityFromSam } from "../controllers/sam.gov.controllers.js";
+import prisma from "../config/db.js";
 
 // todo: implement SAM routes
 // (TIDY todo): port over routes to controllers instead of having logic in routes files
@@ -131,25 +133,66 @@ router.get("/opportunities/event", async (req, res) => {
     });
     const data = response.data;
 
-    const opportunities = 
-    data.response?.opportunitiesData ||
-    data?.opportunitiesData ||
-    data?.opportunities ||
-    data?.data ||
-     [];
+    const opportunities =
+      data.response?.opportunitiesData ||
+      data?.opportunitiesData ||
+      data?.opportunities ||
+      data?.data ||
+      [];
 
-     const filteredOpportunities = opportunities.filter(
-       matchesOpportunityIndustryDay,
-     );
-     return res.status(200).json({
+    const filteredOpportunities = opportunities.filter(
+      matchesOpportunityIndustryDay,
+    );
+
+    // Upsert into DB (Opportunity first, then IndustryDay linked to Opportunity)
+    const dbResults = await prisma.$transaction(async (tx) => {
+      let attempted = 0;
+      let upserted = 0;
+      let skipped = 0;
+      const errors = [];
+
+      for (const opp of filteredOpportunities) {
+        attempted += 1;
+
+        // We need a stable external id (noticeId) to dedupe & link
+        if (!opp?.noticeId && !opp?.id) {
+          skipped += 1;
+          continue;
+        }
+
+        try {
+          const savedOpp = await upsertOpportunityFromSam(tx, opp); // must upsert by noticeId
+          await upsertIndustryDayFromSam(tx, opp, savedOpp.id); // upsert by externalEventId and set opportunityId
+          upserted += 1;
+        } catch (e) {
+          skipped += 1;
+          errors.push({
+            noticeId: opp?.noticeId ?? null,
+            title: opp?.title ?? null,
+            message: e?.message ?? String(e),
+          });
+        }
+      }
+
+      return { attempted, upserted, skipped, errors };
+    });
+
+    return res.status(200).json({
       meta: {
         pulled: opportunities.length,
         returned: filteredOpportunities.length,
       },
+      db: {
+        attempted: dbResults.attempted,
+        upserted: dbResults.upserted,
+        skipped: dbResults.skipped,
+        errors: dbResults.errors,
+      },
       data: {
         opportunities: filteredOpportunities,
+        dbErrors: dbResults.errors.slice(0, 5),
       }
-     })
+    });
   } catch (error) {
     console.error("Error in getIndustryDayOpportunities controller: ", error);
     res.status(500).json({
