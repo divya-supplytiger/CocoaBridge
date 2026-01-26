@@ -1,0 +1,275 @@
+generator client {
+  provider = "prisma-client-js"
+  // output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AcquisitionPath {
+  MICROPURCHASE
+  GSA
+  OPEN_MARKET
+  SUBCONTRACTING
+}
+
+enum InboxStatus {
+  NEW
+  IN_REVIEW
+  QUALIFIED
+  DISMISSED
+  CONTACTED
+  CLOSED
+}
+
+enum ProcurementType {
+  U // J&A
+  P // Pre-solicitation
+  A // Award Notice
+  R // Sources Sought
+  S // Special Notice
+  O // Solicitation
+  G // Sale of Surplus Property
+  K // Combined Synopsis/Solicitation
+  I // Intent to Bundle
+}
+
+enum ContactType {
+  PRIMARY
+  SECONDARY
+  OTHER
+}
+
+enum IndustryDayStatus {
+  OPEN
+  NOT_ATTENDING
+  ATTENDING
+  ATTENDED
+  PAST_EVENT
+}
+
+enum SourceSystem {
+  SAM
+  USASPENDING
+  MANUAL
+}
+
+model Contact {
+  id   String      @id @default(cuid())
+  type ContactType @default(OTHER)
+
+  fullName String?
+  email    String?
+  phone    String?
+  title    String?
+
+  // Durable relationship
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  // Workflow relationship
+  inboxItemId String?
+  inboxItem   InboxItem? @relation(fields: [inboxItemId], references: [id], onDelete: SetNull)
+
+  // Opportunity
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  // IndustryDay
+  industryDayId String?
+  industryDay   IndustryDay? @relation(fields: [industryDayId], references: [id], onDelete: SetNull)
+
+  // Optional: source traceability + dedupe
+  source     SourceSystem @default(SAM)
+  externalId String? // e.g., "SAM:noticeId:primary:email" if you want
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Indexes
+  @@index([email])
+  @@index([phone])
+  @@index([organizationId])
+  @@index([opportunityId])
+  @@index([industryDayId])
+  @@index([inboxItemId])
+}
+
+model Organization {
+  id       String  @id @default(cuid())
+  name     String
+  uei      String? @unique
+  cageCode String?
+  website  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contacts Contact[]
+
+  inboxItems    InboxItem[]
+  awards        Award[]
+  industryDay   IndustryDay[]
+  opportunities Opportunity[]
+
+  @@index([name])
+  @@index([cageCode])
+}
+
+model Award {
+  id     String       @id @default(cuid())
+  source SourceSystem @default(USASPENDING)
+
+  externalAwardId String? @unique
+  awardingAgency  String?
+  awardingOffice  String?
+
+  naics String?
+  psc   String?
+
+  obligatedAmount Decimal?  @db.Decimal(18, 2)
+  startDate       DateTime?
+  endDate         DateTime?
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  rawPayload Json
+
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  inboxItems InboxItem[]
+
+  @@index([startDate])
+  @@index([endDate])
+  @@index([naics])
+  @@index([psc])
+}
+
+model IndustryDay {
+  id     String       @id @default(cuid())
+  source SourceSystem @default(SAM)
+
+  // Deduplication check
+  externalEventId String? @unique
+  title           String
+  summary         String?
+
+  location  String?
+  eventDate DateTime?
+  host      String?
+
+  contacts Contact[]
+
+  status IndustryDayStatus @default(OPEN)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  rawPayload Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  inboxItems InboxItem[]
+
+  @@index([eventDate])
+  @@index([status])
+}
+
+model Opportunity {
+  id     String       @id @default(cuid())
+  source SourceSystem @default(SAM)
+
+  // Dedup for SAM
+  noticeId           String?          @unique
+  solicitationNumber String?
+  title              String?
+  procurementType    ProcurementType?
+  active             Boolean          @default(true)
+
+  postedDate       DateTime?
+  responseDeadline DateTime?
+  archiveDate      DateTime?
+
+  // Classification
+  naicsCode           String?
+  pscCode             String?
+  setAside            String? // store raw like "NONE", "SBA", etc.
+  setAsideDescription String?
+
+  // Org / office metadata
+  fullParentPathName String?
+  fullParentPathCode String?
+  city               String?
+  state              String?
+  zip                String?
+  countryCode        String?
+
+  // Relationships
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  // Inbox workflow
+  inboxItems InboxItem[]
+
+  // Contacts scraped from SAM for this opportunity (optional but useful)
+  contacts Contact[]
+
+  rawPayload Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([postedDate])
+  @@index([responseDeadline])
+  @@index([archiveDate])
+  @@index([naicsCode])
+  @@index([pscCode])
+  @@index([procurementType])
+  @@index([solicitationNumber])
+  @@index([title])
+}
+
+model InboxItem {
+  id String @id @default(cuid())
+
+  source          SourceSystem
+  acquisitionPath AcquisitionPath
+
+  title   String?
+  summary String?
+  notes   String?
+
+  reviewStatus InboxStatus @default(NEW)
+  reviewedBy   String?
+  reviewedAt   DateTime?
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  awardId String?
+  award   Award?  @relation(fields: [awardId], references: [id], onDelete: SetNull)
+
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  industryDayId String?
+  industryDay   IndustryDay? @relation(fields: [industryDayId], references: [id], onDelete: SetNull)
+
+  contacts Contact[]
+
+  rawPayload Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([reviewStatus])
+  @@index([acquisitionPath])
+  @@index([createdAt])
+  @@index([organizationId])
+  @@index([awardId])
+  @@index([opportunityId])
+  @@index([industryDayId])
+}

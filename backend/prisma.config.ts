@@ -1,7 +1,6 @@
 import { defineConfig } from "prisma/config";
-import { ENV } from "../config/env.js";
+import { ENV } from "./src/config/env.js";
 
-// TODO: initialize db via migration scripts
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {

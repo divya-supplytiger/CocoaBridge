@@ -158,5 +158,8 @@ router.get("/opportunities/event", async (req, res) => {
 });
 
 
+// TODO: Cache into db --> 
+// description: https://api.sam.gov/prod/opportunities/v1/noticedesc?noticeid=ab59e24aa7a143378601cee95947dd64&api_key=YOUR_API_KEY
+// and capture details that match our criteria
 
 export default router;

@@ -3,7 +3,7 @@ import { ENV } from "./config/env.js";
 import cors from "cors";
 import samRoutes from "./routes/sam.routes.js";
 import usaspendingRoutes from "./routes/usaspending.routes.js";
-// import { prisma } from "./config/db.js";
+import  defineConfig from "../prisma.config.ts";
 
 const app = express();
 
