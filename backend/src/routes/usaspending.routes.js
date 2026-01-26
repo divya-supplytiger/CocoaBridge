@@ -97,7 +97,7 @@ router.post("/search-award", async (req, res) => {
 
     return res.status(200).json({
       count: response.data.page_metadata?.total || 0,
-      results: response.data.results,
+      data: response.data.results,
     });
   } catch (error) {
     console.error("USAspending API error:", error?.response?.data || error);
@@ -137,7 +137,7 @@ router.post("/search-count", async (req, res) => {
         timeout: 20000,
       }
     );
-    return res.status(200).json({ response: response.data });
+    return res.status(200).json({ data: response.data });
   } catch (error) {
     console.error("USAspending API error:", error?.response?.data || error);
     res.status(500).json({
@@ -196,7 +196,7 @@ router.post("/search-category", async (req, res) => {
         timeout: 20000,
       },
     );
-    return res.status(200).json({ response: response.data });
+    return res.status(200).json({ data: response.data });
   } 
  catch (error) {
     console.error("USAspending API error:", error?.response?.data || error);
@@ -220,7 +220,7 @@ router.get("/award/:award_id", async (req, res) => {
         timeout: 20000,
       },
     );
-    return res.status(200).json({ response: response.data });
+    return res.status(200).json({ data: response.data });
   } catch (error) {
     console.error("USAspending API error:", error?.response?.data || error);
     res.status(500).json({

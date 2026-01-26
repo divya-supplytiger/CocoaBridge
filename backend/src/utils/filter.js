@@ -12,7 +12,7 @@ export const startsWithAny = (value, prefixes = []) => {
 export const titleMatchesKeyword = (title, keywords) => {
     if(!title) return false;
     const t = String(title).toLowerCase();
-    const matches = keywords.some((kw) => t.includes(kw));
+    const matches = keywords.some((kw) => t.includes(String(kw).toLowerCase()));
     return matches;
 };
 
@@ -46,6 +46,7 @@ export const extractNaicsCodes = (item) => {
 };
 
 export const matchesOpportunityIndustryDay = (item) => {
+    
     const titleMatch = titleMatchesKeyword(item?.title, industryDayTitleKeywords);
 
     const countryCodes = extractCountry(item);
@@ -85,11 +86,19 @@ export const matchesOpportunitySolicitation = (item) => {
 };;
 
 export const matchesOpportunityHistorical = (item) => {
+
+      const titleMatch = titleMatchesKeyword(
+        item?.title,
+        solicitationTitleKeywords,
+      );
     const countryCodes = extractCountry(item);
     const countryMatch = countryCodes.length === 0 ? true: countryCodes.some(isValidCountry);
 
     const naicsCodes = extractNaicsCodes(item);
     const naicsMatch = naicsCodes.some((code) => startsWithAny(code, naicsPrefixes));
     const classificiationMatch = startsWithAny(item?.classificationCode, classificationPrefixes);
+
+    return (titleMatch || naicsMatch || classificiationMatch) && countryMatch;
+
 }
 // TODO: Add Paginator utility function

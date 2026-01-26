@@ -116,6 +116,8 @@ router.get("/opportunities/historical", async (req, res) => {
 
 // This endpoint fetches opportunities and filters them based on criteria
 // The current criteria are defined in the matchesOpportunity function
+
+// TODO: account for variables
 router.get("/opportunities/event", async (req, res) => {
   try {
     const { query } = req;
