@@ -45,6 +45,7 @@ export const normalizeOpportunity = (opportunity) => {
         countryCode,
         postedDate,
         responseDeadline,
+        setAside,
     }
 };
 
