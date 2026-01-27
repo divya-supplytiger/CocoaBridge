@@ -60,10 +60,6 @@ export const extractContact = (opportunity) => {
   return contacts;
 };
 
-
-
-
-
 export const extractType = (opportunity) => {
   const typeField = opportunity?.type || opportunity?.baseType || null;
   if(typeField?.includes("Pre")) return Type.PRE_SOLICITATION;
@@ -208,7 +204,6 @@ export const matchesOpportunitySolicitation = (item) => {
 };
 
 
-// todo: implement historical opportunity matching logic
 export const matchesOpportunityHistorical = (item) => {
 
       const titleMatch = titleMatchesKeyword(
@@ -224,4 +219,3 @@ export const matchesOpportunityHistorical = (item) => {
 
     return (titleMatch || naicsMatch || classificiationMatch) && countryMatch;
 }
-// TODO: Add Paginator utility function
