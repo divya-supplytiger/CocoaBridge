@@ -23,16 +23,18 @@ enum InboxStatus {
   CLOSED
 }
 
-enum ProcurementType {
-  U // J&A
-  P // Pre-solicitation
-  A // Award Notice
-  R // Sources Sought
-  S // Special Notice
-  O // Solicitation
-  G // Sale of Surplus Property
-  K // Combined Synopsis/Solicitation
-  I // Intent to Bundle
+enum Type {
+  PRE_SOLICITATION
+  AWARD_NOTICE
+  SOURCES_SOUGHT
+  SPECIAL_NOTICE
+  SOLICITATION
+  OTHER
+}
+
+enum OppTag {
+  INDUSTRY_DAY
+  GENERAL
 }
 
 enum ContactType {
@@ -80,9 +82,7 @@ model Contact {
   industryDayId String?
   industryDay   IndustryDay? @relation(fields: [industryDayId], references: [id], onDelete: SetNull)
 
-  // Optional: source traceability + dedupe
-  source     SourceSystem @default(SAM)
-  externalId String? // e.g., "SAM:noticeId:primary:email" if you want
+  externalId String? @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -103,15 +103,15 @@ model Organization {
   cageCode String?
   website  String?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
   contacts Contact[]
 
   inboxItems    InboxItem[]
   awards        Award[]
   industryDay   IndustryDay[]
   opportunities Opportunity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([name])
   @@index([cageCode])
@@ -125,8 +125,8 @@ model Award {
   awardingAgency  String?
   awardingOffice  String?
 
-  naics String?
-  psc   String?
+  naicsCodes String[] @default([])
+  pscCode    String?
 
   obligatedAmount Decimal?  @db.Decimal(18, 2)
   startDate       DateTime?
@@ -135,16 +135,15 @@ model Award {
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
-  rawPayload Json
-
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
   inboxItems InboxItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([startDate])
   @@index([endDate])
-  @@index([naics])
-  @@index([psc])
+  @@index([naicsCodes], type: Gin)
+  @@index([pscCode])
 }
 
 model IndustryDay {
@@ -169,8 +168,6 @@ model IndustryDay {
   opportunityId String?      @unique
   opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
 
-  rawPayload Json
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -187,25 +184,25 @@ model Opportunity {
   source SourceSystem @default(SAM)
 
   // Dedup for SAM
-  noticeId           String?          @unique
+  noticeId           String? @unique
   solicitationNumber String?
   title              String?
-  procurementType    ProcurementType?
-  active             Boolean          @default(true)
+  type               Type?
+  tag                OppTag  @default(GENERAL)
+  active             Boolean @default(true)
+
+  description String?
 
   postedDate       DateTime?
   responseDeadline DateTime?
-  archiveDate      DateTime?
 
   // Classification
-  naicsCode           String?
-  pscCode             String?
-  setAside            String? // store raw like "NONE", "SBA", etc.
-  setAsideDescription String?
+  naicsCodes String[] @default([])
+  pscCode    String?
+  setAside   String? // store raw like "NONE", "SBA", etc.
 
   // Org / office metadata
   fullParentPathName String?
-  fullParentPathCode String?
   city               String?
   state              String?
   zip                String?
@@ -221,18 +218,15 @@ model Opportunity {
   // Contacts scraped from SAM for this opportunity (optional but useful)
   contacts Contact[]
 
-  rawPayload Json
-
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   industryDay IndustryDay?
 
   @@index([postedDate])
   @@index([responseDeadline])
-  @@index([archiveDate])
-  @@index([naicsCode])
+  @@index([naicsCodes], type: Gin)
   @@index([pscCode])
-  @@index([procurementType])
+  @@index([type])
   @@index([solicitationNumber])
   @@index([title])
 }
@@ -242,6 +236,8 @@ model InboxItem {
 
   source          SourceSystem
   acquisitionPath AcquisitionPath
+  type            Type
+  tag             OppTag
 
   title   String?
   summary String?
@@ -265,13 +261,13 @@ model InboxItem {
 
   contacts Contact[]
 
-  rawPayload Json
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([reviewStatus])
   @@index([acquisitionPath])
+  @@index([type])
+  @@index([tag])
   @@index([createdAt])
   @@index([organizationId])
   @@index([awardId])

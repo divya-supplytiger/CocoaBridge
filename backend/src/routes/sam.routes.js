@@ -122,7 +122,8 @@ router.get("/opportunities/historical", async (req, res) => {
 // TODO: account for variables
 router.get("/opportunities/event", async (req, res) => {
   try {
-    const { query } = req;
+    const query = req.query;
+
 
     const response = await axios.get(ENV.SAMGOV_BASE_URL, {
       params: {
@@ -131,6 +132,7 @@ router.get("/opportunities/event", async (req, res) => {
       },
       timeout: 50000,
     });
+
     const data = response.data;
 
     const opportunities =
@@ -144,7 +146,6 @@ router.get("/opportunities/event", async (req, res) => {
       matchesOpportunityIndustryDay,
     );
 
-    // Upsert into DB (Opportunity first, then IndustryDay linked to Opportunity)
     const dbResults = await prisma.$transaction(async (tx) => {
       let attempted = 0;
       let upserted = 0;
@@ -154,20 +155,19 @@ router.get("/opportunities/event", async (req, res) => {
       for (const opp of filteredOpportunities) {
         attempted += 1;
 
-        // We need a stable external id (noticeId) to dedupe & link
         if (!opp?.noticeId && !opp?.id) {
           skipped += 1;
           continue;
         }
 
         try {
-          const savedOpp = await upsertOpportunityFromSam(tx, opp); // must upsert by noticeId
-          await upsertIndustryDayFromSam(tx, opp, savedOpp.id); // upsert by externalEventId and set opportunityId
+          const savedOpp = await upsertOpportunityFromSam(tx, opp);
+          await upsertIndustryDayFromSam(tx, opp, savedOpp.id);
           upserted += 1;
         } catch (e) {
           skipped += 1;
           errors.push({
-            noticeId: opp?.noticeId ?? null,
+            noticeId: opp?.noticeId ?? opp?.id ?? null,
             title: opp?.title ?? null,
             message: e?.message ?? String(e),
           });
@@ -182,26 +182,26 @@ router.get("/opportunities/event", async (req, res) => {
         pulled: opportunities.length,
         returned: filteredOpportunities.length,
       },
-      db: {
-        attempted: dbResults.attempted,
-        upserted: dbResults.upserted,
-        skipped: dbResults.skipped,
-        errors: dbResults.errors,
-      },
+      db: dbResults,
       data: {
         opportunities: filteredOpportunities,
-        dbErrors: dbResults.errors.slice(0, 5),
-      }
+      },
     });
   } catch (error) {
-    console.error("Error in getIndustryDayOpportunities controller: ", error);
-    res.status(500).json({
+    console.error("Error in getIndustryDayOpportunities controller:", error);
+
+    const detailsRaw = error?.response?.data;
+    const details =
+      typeof detailsRaw === "string"
+        ? detailsRaw.slice(0, 2000)
+        : (detailsRaw ?? null);
+
+    return res.status(500).json({
       error: "Internal Server Error -- failed to fetch data from SAM.gov",
-      details: error?.response?.data,
+      details,
     });
   }
 });
-
 
 // TODO: Cache into db --> 
 // description: https://api.sam.gov/prod/opportunities/v1/noticedesc?noticeid=ab59e24aa7a143378601cee95947dd64&api_key=YOUR_API_KEY

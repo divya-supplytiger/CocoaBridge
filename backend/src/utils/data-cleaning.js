@@ -1,4 +1,43 @@
-import { SourceSystem, IndustryDayStatus } from "@prisma/client";
+import { SourceSystem } from "@prisma/client";
+import { toDateOrNull, computeIndustryDayStatus, extractLocation, extractNaicsCodes, extractContact, extractType, extractDescription, extractTag} from "../utils/filter.js";
+
+// todo: normalize SAM Opportunity data from SAM API, extract contact info, description, type or baseType, all naics codes or naics code, location
+export const normalizeOpportunity = (opportunity) => {
+
+    const noticeId = opportunity?.noticeId || opportunity?.id || null;
+    const solicitationNumber = opportunity?.solicitationNumber || null;
+    const title = opportunity?.title || "No Title";
+    const type = extractType(opportunity);
+    const tag = extractTag(opportunity);
+    const active = String(opportunity?.active).toLowerCase() === "yes" ? true : false;
+    const description = extractDescription(opportunity);
+    const naicsCodes = extractNaicsCodes(opportunity);
+    const pscCode = opportunity?.classificationCode || null;
+
+    const fullParentPathName = opportunity?.fullParentPathName || null;
+    const city = opportunity?.officeAddress?.city || opportunity?.placeOfPerformance?.city?.name || null;
+    const state = opportunity?.officeAddress?.state || opportunity?.placeOfPerformance?.state?.name || null;
+    const zip = opportunity?.officeAddress?.zipcode || opportunity?.placeOfPerformance?.zip || null;
+    const countryCode = opportunity?.officeAddress?.countryCode || opportunity?.placeOfPerformance?.country?.code || null;
+
+    return {
+        source: SourceSystem.SAM,
+        noticeId,
+        solicitationNumber,
+        title,
+        type,
+        tag,
+        active,
+        description,
+        naicsCodes,
+        pscCode,
+        fullParentPathName,
+        city,
+        state,
+        zip,
+        countryCode
+    }
+};
 
 // Normalize SAM Industry Day opportunity data from SAM API
 export const normalizeSamIndustryDay = (opportunity) => {
@@ -13,19 +52,7 @@ export const normalizeSamIndustryDay = (opportunity) => {
     || opportunity?.fullParentPathCode ||
     null;
 
-  const locationParts = opportunity?.officeAddress ? [
-    opportunity?.officeAddress?.city,
-    opportunity?.officeAddress?.state,
-    opportunity?.officeAddress?.zipcode,
-    opportunity?.officeAddress?.countryCode,
-  ].filter(Boolean) : opportunity?.placeOfPerformance ? [
-    opportunity?.placeOfPerformance?.city?.name,
-    opportunity?.placeOfPerformance?.state?.name,
-    opportunity?.placeOfPerformance?.zip,
-    opportunity?.placeOfPerformance?.country?.code,
-  ].filter(Boolean) : [];
-
-    const location = locationParts.length ? locationParts.join(", ") : null;
+    const location = extractLocation(opportunity);
 
   return {
     externalEventId,
@@ -36,22 +63,5 @@ export const normalizeSamIndustryDay = (opportunity) => {
     eventDate,
     host,
     status: computeIndustryDayStatus(eventDate),
-    rawPayload: opportunity,
   };
 }
-
-export const toDateOrNull = (value) => {
-    if (value === null || value === undefined || value === "") return null;
-    const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? null: d;
-};
-
-export const computeIndustryDayStatus = (eventDate) => {
-  if (!eventDate) return IndustryDayStatus.OPEN;
-  const now = new Date();
-  const cutoff = eventDate.getTime() + (24 * 60 * 60 * 1000) * 7; // +7 days (temp workaround)
-
-  return cutoff < now.getTime()
-    ? IndustryDayStatus.PAST_EVENT
-    : IndustryDayStatus.OPEN;
-};
