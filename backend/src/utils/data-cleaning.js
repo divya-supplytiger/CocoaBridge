@@ -1,5 +1,6 @@
 import { SourceSystem } from "@prisma/client";
 import { toDateOrNull, computeIndustryDayStatus, extractLocation, extractNaicsCodes, extractContact, extractType, extractDescription, extractTag} from "../utils/filter.js";
+import { normalize } from "path";
 
 // todo: normalize SAM Opportunity data from SAM API, extract contact info, description, type or baseType, all naics codes or naics code, location
 export const normalizeOpportunity = (opportunity) => {
@@ -14,6 +15,12 @@ export const normalizeOpportunity = (opportunity) => {
     const naicsCodes = extractNaicsCodes(opportunity);
     const pscCode = opportunity?.classificationCode || null;
 
+    const postedDate = toDateOrNull(opportunity?.postedDate);
+    const responseDeadline = toDateOrNull(
+      opportunity?.responseDeadLine || opportunity?.responseDeadline,
+    );
+
+    const setAside = opportunity?.typeOfSetAside || null;
     const fullParentPathName = opportunity?.fullParentPathName || null;
     const city = opportunity?.officeAddress?.city || opportunity?.placeOfPerformance?.city?.name || null;
     const state = opportunity?.officeAddress?.state || opportunity?.placeOfPerformance?.state?.name || null;
@@ -35,8 +42,29 @@ export const normalizeOpportunity = (opportunity) => {
         city,
         state,
         zip,
-        countryCode
+        countryCode,
+        postedDate,
+        responseDeadline,
     }
+};
+
+export const normalizeSamHistoricalOpportunity = (opportunity) => {
+    // For now, reuse the same normalization as regular opportunities
+    // but set active to false if the opportunity is past its response deadline
+    const normalized = normalizeOpportunity(opportunity);
+
+    let isActive = false;
+
+    const responseDeadline = normalized.responseDeadline;
+
+    if (!responseDeadline) {
+      normalized.active = false;
+      return normalized;
+    }
+    const now = new Date();
+
+    normalized.active = now <= responseDeadline.getTime();
+    return normalized;
 };
 
 // Normalize SAM Industry Day opportunity data from SAM API

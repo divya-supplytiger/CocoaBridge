@@ -60,10 +60,6 @@ export const extractContact = (opportunity) => {
   return contacts;
 };
 
-
-
-
-
 export const extractType = (opportunity) => {
   const typeField = opportunity?.type || opportunity?.baseType || null;
   if(typeField?.includes("Pre")) return Type.PRE_SOLICITATION;

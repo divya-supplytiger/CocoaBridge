@@ -2,6 +2,7 @@ import { SourceSystem, IndustryDayStatus } from "@prisma/client";
 import {
   normalizeSamIndustryDay,
   normalizeOpportunity,
+  normalizeSamHistoricalOpportunity,
 } from "../utils/data-cleaning.js";
 
 import { extractContact, toDateOrNull } from "../utils/filter.js";
@@ -79,6 +80,48 @@ export async function upsertContactsForOpportunity(db, samOpportunity, opportuni
 }
 };
 
+
+export async function upsertHistoricalOpportunityFromSam(prisma, opportunity) {
+  const normalized = normalizeSamHistoricalOpportunity(opportunity);
+
+  if (!normalized.noticeId) {
+    throw new Error("Missing noticeId for Historical Opportunity upsert");
+  }
+
+  const data = {
+    source: SourceSystem.SAM,
+
+    noticeId: normalized.noticeId,
+    solicitationNumber: normalized.solicitationNumber ?? null,
+    title: normalized.title ?? null,
+    type: normalized.type ?? null,
+    tag: normalized.tag,
+    active: normalized.active,
+
+    description: normalized.description ?? null,
+
+    postedDate: normalized.postedDate,
+    responseDeadline: normalized.responseDeadline,
+
+    naicsCodes: normalized.naicsCodes ?? [],
+    pscCode: normalized.pscCode ?? null,
+    setAside: normalized.setAside ?? null,
+
+    fullParentPathName: normalized.fullParentPathName ?? null,
+    city: normalized.city ?? null,
+    state: normalized.state ?? null,
+    zip: normalized.zip ?? null,
+    countryCode: normalized.countryCode ?? null,
+};
+
+  // with historical opportunities, we do not upsert contacts
+  return prisma.opportunity.upsert({
+    where: { noticeId: normalized.noticeId },
+    update: data,
+    create: data,
+  });
+};
+
 export async function upsertOpportunityFromSam(prisma, opportunity) {
   const normalized = normalizeOpportunity(opportunity);
 
@@ -99,15 +142,13 @@ export async function upsertOpportunityFromSam(prisma, opportunity) {
     description: normalized.description ?? null,
 
     // Dates (still derived from raw SAM payload)
-    postedDate: toDateOrNull(opportunity?.postedDate),
-    responseDeadline: toDateOrNull(
-      opportunity?.responseDeadLine || opportunity?.responseDeadline,
-    ),
+    postedDate: normalized.postedDate,
+    responseDeadline: normalized.responseDeadline,
 
     // Classification
     naicsCodes: normalized.naicsCodes ?? [],
     pscCode: normalized.pscCode ?? null,
-    setAside: opportunity?.typeOfSetAside ?? null,
+    setAside: normalized.setAside ?? null,
 
     // Org / office metadata
     fullParentPathName: normalized.fullParentPathName ?? null,
@@ -171,3 +212,5 @@ export async function upsertIndustryDayFromSam(
     },
   });
 }
+
+// todo: take opportunities marked as "AWARDED" and fill in award data in the awards table

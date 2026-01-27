@@ -2,7 +2,7 @@ import express from "express";
 import axios from "axios";
 import { ENV } from "../config/env.js";
 import { matchesOpportunityIndustryDay, matchesOpportunitySolicitation, matchesOpportunityHistorical } from "../utils/filter.js";
-import { upsertIndustryDayFromSam, upsertOpportunityFromSam } from "../controllers/sam.controller.js";
+import { upsertIndustryDayFromSam, upsertOpportunityFromSam, upsertHistoricalOpportunityFromSam} from "../controllers/sam.controller.js";
 import prisma from "../config/db.js";
 
 // todo: implement SAM routes
@@ -44,9 +44,7 @@ router.get("/ping", (req, res) => {
 
 router.get("/opportunities/current", async (req, res) => {
   try {
-
-        const { query } = req;
-
+        const query  = req.query;
             const response = await axios.get(ENV.SAMGOV_BASE_URL, {
               params: {
                 api_key: ENV.SAMGOV_API_KEY,
@@ -68,11 +66,39 @@ router.get("/opportunities/current", async (req, res) => {
           matchesOpportunitySolicitation,
         );
 
+        let attempted = 0;
+        let upserted = 0;
+        let skipped = 0;
+        const errors = [];
+        
+        for (const opp of filteredOpportunities) {
+          attempted += 1;
+          if (!opp?.noticeId && !opp?.id) {
+            skipped += 1;
+            continue;
+          }
+
+          try {
+            await prisma.$transaction(async (tx) => {
+              await upsertOpportunityFromSam(tx, opp);
+            }, {timeout: 20000});
+            upserted += 1;
+          } catch (e) {
+            skipped += 1;
+            errors.push({
+              noticeId: opp?.noticeId ?? opp?.id ?? null,
+              title: opp?.title ?? null,
+              message: e?.message ?? String(e),
+            });
+          }
+        }
+
         return res.status(200).json({
           meta: {
             pulled: opportunities.length,
             returned: filteredOpportunities.length,
           },
+          db: { attempted, upserted, skipped, errors },
           data: {
             opportunities: filteredOpportunities,
           },
@@ -91,7 +117,7 @@ router.get("/opportunities/current", async (req, res) => {
 // get opportunities from SAM.gov by year, then get more specific with filters later
 router.get("/opportunities/historical", async (req, res) => {
   try {
-    const { query } = req;
+    const query = req.query;
 
     console.log(ENV.SAMGOV_BASE_URL);
     const response = await axios.get(ENV.SAMGOV_BASE_URL, {
@@ -102,9 +128,51 @@ router.get("/opportunities/historical", async (req, res) => {
       timeout: 75000,
     });
 
-    return res.status(200).json({ response: response.data });
+    const data = response.data;
+    const opportunities =
+      data.response?.opportunitiesData ||
+      data?.opportunitiesData ||
+      data?.opportunities ||
+      data?.data ||
+      [];
+
+    const filteredOpportunities = opportunities.filter(
+      matchesOpportunityHistorical,
+    );
+
+    let attempted = 0;
+    let upserted = 0;
+    let skipped = 0;
+    const errors = [];
+
+    for (const opp of filteredOpportunities) {
+      attempted += 1;
+
+      if (!opp?.noticeId && !opp?.id) {
+        skipped += 1;
+        continue;
+      }
+
+      try {
+        await prisma.$transaction(async (tx) => {
+          await upsertHistoricalOpportunityFromSam(tx, opp);
+        }, {timeout: 20000});
+        upserted += 1;
+      } catch (e) {
+        skipped += 1;
+        errors.push({
+          noticeId: opp?.noticeId ?? opp?.id ?? null,
+          title: opp?.title ?? null,
+          message: e?.message ?? String(e),
+        });
+      }
+    }
+
+    return res.status(200).json({ meta: {pulled: opportunities.length,
+       returned: filteredOpportunities.length},
+        db: {attempted, upserted, skipped, errors},
+        data: { opportunities: filteredOpportunities } });
         
-    
   } catch (error) {
     console.error("Error in getHistoricalOpportunities controller:", error);
     res
@@ -119,11 +187,9 @@ router.get("/opportunities/historical", async (req, res) => {
 // This endpoint fetches opportunities and filters them based on criteria
 // The current criteria are defined in the matchesOpportunity function
 
-// TODO: account for variables
 router.get("/opportunities/event", async (req, res) => {
   try {
     const query = req.query;
-
 
     const response = await axios.get(ENV.SAMGOV_BASE_URL, {
       params: {
@@ -146,7 +212,6 @@ router.get("/opportunities/event", async (req, res) => {
       matchesOpportunityIndustryDay,
     );
 
-    
       let attempted = 0;
       let upserted = 0;
       let skipped = 0;
