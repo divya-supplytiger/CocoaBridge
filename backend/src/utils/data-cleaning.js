@@ -54,8 +54,6 @@ export const normalizeSamHistoricalOpportunity = (opportunity) => {
     // but set active to false if the opportunity is past its response deadline
     const normalized = normalizeOpportunity(opportunity);
 
-    let isActive = false;
-
     const responseDeadline = normalized.responseDeadline;
 
     if (!responseDeadline) {
@@ -64,7 +62,7 @@ export const normalizeSamHistoricalOpportunity = (opportunity) => {
     }
     const now = new Date();
 
-    normalized.active = now <= responseDeadline.getTime();
+    normalized.active = now <= responseDeadline;
     return normalized;
 };
 
