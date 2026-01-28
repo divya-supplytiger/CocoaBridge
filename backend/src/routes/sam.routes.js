@@ -1,7 +1,7 @@
 import express from "express";
 import axios from "axios";
 import { ENV } from "../config/env.js";
-import { matchesOpportunityIndustryDay, matchesOpportunitySolicitation, matchesOpportunityHistorical } from "../utils/filter.js";
+import { matchesOpportunityIndustryDay, matchesOpportunitySolicitation, matchesOpportunityHistorical } from "../utils/filterSAM.js";
 import { upsertIndustryDayFromSam, upsertOpportunityFromSam, upsertHistoricalOpportunityFromSam} from "../controllers/sam.controller.js";
 import prisma from "../config/db.js";
 

@@ -3,9 +3,9 @@ import {
   normalizeSamIndustryDay,
   normalizeOpportunity,
   normalizeSamHistoricalOpportunity,
-} from "../utils/data-cleaning.js";
+} from "../utils/normalizeSAM.js";
 
-import { extractContact, toDateOrNull } from "../utils/filter.js";
+import { extractContact, toDateOrNull } from "../utils/filterSAM.js";
 export async function upsertContactsForOpportunity(db, samOpportunity, opportunityId) {
   const contacts = extractContact(samOpportunity);
   // 1) Upsert/create the PERSON (Contact)
