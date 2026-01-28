@@ -206,6 +206,7 @@ model Opportunity {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   industryDay IndustryDay?
+  awards      Award[]
 
   @@index([postedDate])
   @@index([responseDeadline])
@@ -220,9 +221,7 @@ model Award {
   id     String       @id @default(cuid())
   source SourceSystem @default(USASPENDING)
 
-  externalAwardId String? @unique
-  awardingAgency  String?
-  awardingOffice  String?
+  externalId String? @unique
 
   naicsCodes String[] @default([])
   pscCode    String?
@@ -230,6 +229,9 @@ model Award {
   obligatedAmount Decimal?  @db.Decimal(18, 2)
   startDate       DateTime?
   endDate         DateTime?
+
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
 
   buyingOrganizationId String?
   buyingOrganization   BuyingOrganization? @relation(fields: [buyingOrganizationId], references: [id], onDelete: SetNull)
@@ -255,9 +257,9 @@ model IndustryDay {
   source SourceSystem @default(SAM)
 
   // Deduplication check
-  externalEventId String? @unique
-  title           String
-  summary         String?
+  externalId String? @unique
+  title      String
+  summary    String?
 
   location  String?
   eventDate DateTime?

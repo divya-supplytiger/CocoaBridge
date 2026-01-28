@@ -1,5 +1,5 @@
 import { SourceSystem } from "@prisma/client";
-import { toDateOrNull, computeIndustryDayStatus, extractLocation, extractNaicsCodes, extractContact, extractType, extractDescription, extractTag} from "./extractSAM.js";
+import { toDateOrNull, computeIndustryDayStatus, extractLocation, extractNaicsCodes, extractContact, extractType, extractDescription, extractTag, extractAwardAndRelatedFields} from "./extractSAM.js";
 
 // todo: normalize SAM Opportunity data from SAM API, extract contact info, description, type or baseType, all naics codes or naics code, location
 export const normalizeOpportunity = (opportunity) => {
@@ -48,6 +48,33 @@ export const normalizeOpportunity = (opportunity) => {
     }
 };
 
+// ADAPT
+export const normalizeSamRecipient = (awardee) => {
+    if (!awardee) {
+        return null;
+    }
+    return {
+        name: awardee?.name || "Unknown Recipient",
+        uei: awardee?.ueiSAM || null,
+    };
+};
+
+export const normalizeSamAward = (opportunity) => {
+  const award = opportunity?.award;
+  if (!award?.number) {
+    return null;
+  }
+
+  return {
+    externalId: award.number,
+    startDate: toDateOrNull(award.date),
+    endDate: toDateOrNull(award.date), // sam.gov usually doesn't provide endDate
+    obligatedAmount: award.amount ? Number(award.amount) : 0,
+    naicsCodes: extractNaicsCodes(opportunity) ?? [],
+    pscCode: opportunity?.classificationCode || null,
+
+  };
+};
 export const normalizeSamHistoricalOpportunity = (opportunity) => {
     // For now, reuse the same normalization as regular opportunities
     // but set active to false if the opportunity is past its response deadline
@@ -67,7 +94,7 @@ export const normalizeSamHistoricalOpportunity = (opportunity) => {
 
 // Normalize SAM Industry Day opportunity data from SAM API
 export const normalizeSamIndustryDay = (opportunity) => {
-  const externalEventId = opportunity?.noticeId || opportunity?.id || null;
+  const externalId = opportunity?.noticeId || opportunity?.id || null;
   // Use responseDeadLine as best-available placeholder for eventDate 
   // TODO: (optimize later for accuracy)
     const eventDate = toDateOrNull(
@@ -81,7 +108,7 @@ export const normalizeSamIndustryDay = (opportunity) => {
     const location = extractLocation(opportunity);
 
   return {
-    externalEventId,
+    externalId,
     title: opportunity?.title || "No Title",
     source: SourceSystem.SAM,
     summary: null,

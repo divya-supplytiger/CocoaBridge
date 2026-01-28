@@ -14,6 +14,8 @@ import {
   normalizeSamIndustryDay,
   normalizeOpportunity,
   normalizeSamHistoricalOpportunity,
+  normalizeSamAward,
+  normalizeSamRecipient,
 } from "../utils/normalizeSAM.js";
 
 
@@ -92,13 +94,64 @@ async function upsertContactsForOpportunity(db, samOpportunity, opportunityId) {
 }
 };
 
+async function upsertAwardAndRecipientFromSam(db, samOpportunity, opportunityId) {
+  const award = normalizeSamAward(samOpportunity);
+  if(!award) return null;
 
+  const awardeeRaw = samOpportunity?.award?.awardee || null;
+  const recipientNormalized = normalizeSamRecipient(awardeeRaw);
+
+  // 1) Upsert Recipient (UEI)
+  let recipient = null;
+
+  if(recipientNormalized) {
+    if(recipientNormalized.uei) {
+      recipient = await db.recipient.upsert({
+        where: {uei: recipientNormalized.uei},
+        update: {name: recipientNormalized.name},
+        create: {name: recipientNormalized.name, uei: recipientNormalized.uei},
+      });
+    } else {
+      recipient = await db.recipient.create({
+        data: {name: recipientNormalized.name, uei: null
+        },
+      });
+  }
+}
+  // 2) Upsert Award, link to Recipient
+  const awardRecord = await db.award.upsert({
+    where: { externalId: award.externalId },
+    update: {
+      obligatedAmount: award.obligatedAmount,
+      startDate: award.startDate,
+      endDate: award.endDate,
+      naicsCodes: award.naicsCodes,
+      pscCode: award.pscCode,
+      opportunityId,
+      recipientId: recipient ? recipient.id : null,
+      source: SourceSystem.SAM,
+    },
+    create: {
+      source: SourceSystem.SAM,
+      externalId: award.externalId,
+      obligatedAmount: award.obligatedAmount,
+      startDate: award.startDate,
+      endDate: award.endDate,
+      naicsCodes: award.naicsCodes,
+      pscCode: award.pscCode,
+      opportunityId,
+      recipientId: recipient ? recipient.id : null,
+    },
+  });
+  return awardRecord;
+};
 async function upsertHistoricalOpportunityFromSam(prisma, opportunity) {
   const normalized = normalizeSamHistoricalOpportunity(opportunity);
 
   if (!normalized.noticeId) {
     throw new Error("Missing noticeId for Historical Opportunity upsert");
   }
+
 
   const data = {
     source: SourceSystem.SAM,
@@ -124,24 +177,31 @@ async function upsertHistoricalOpportunityFromSam(prisma, opportunity) {
     state: normalized.state ?? null,
     zip: normalized.zip ?? null,
     countryCode: normalized.countryCode ?? null,
-};
+  };
 
   // with historical opportunities, we do not upsert contacts
-  return prisma.opportunity.upsert({
+  const opp = prisma.opportunity.upsert({
     where: { noticeId: normalized.noticeId },
     update: data,
     create: data,
   });
+
+  if (opportunity?.award?.number) {
+    // IMPORTANT: don't upsert if you don't have a unique key
+    if (!opportunity?.award?.number) return null;
+    await upsertAwardAndRecipientFromSam(prisma, opportunity, opp.id);
+  }
+  return opp;
 };
 
 async function upsertOpportunityFromSam(prisma, opportunity) {
   const normalized = normalizeOpportunity(opportunity);
-  // create helper function to check if opportunity has an award linked to it
-  // if it does, we can upsert the award data as well, and link it to any recipient orgs
+
 
   if (!normalized.noticeId) {
     throw new Error("Missing noticeId for Opportunity upsert");
   }
+
 
   const data = {
     source: SourceSystem.SAM,
@@ -178,6 +238,13 @@ async function upsertOpportunityFromSam(prisma, opportunity) {
     create: data,
   });
 
+  // NEW: Upsert award and recipient associated with this opportunity
+  if (opportunity?.award?.number) {
+    // IMPORTANT: don't upsert if you don't have a unique key
+    if (!opportunity?.award?.number) return null;
+    await upsertAwardAndRecipientFromSam(prisma, opportunity, opp.id);
+  }
+
   // Upsert contacts associated with this opportunity
   await upsertContactsForOpportunity(prisma, opportunity, opp.id);
   return opp;
@@ -191,8 +258,8 @@ async function upsertIndustryDayFromSam(
 ) {
   const normalized = normalizeSamIndustryDay(opportunity);
 
-  if (!normalized.externalEventId) {
-    throw new Error("Missing externalEventId (noticeId/id)");
+  if (!normalized.externalId) {
+    throw new Error("Missing externalId (noticeId/id)");
   }
 
   // Ensure the opportunityId unique constraint won't be violated
@@ -200,7 +267,7 @@ async function upsertIndustryDayFromSam(
     await prisma.industryDay.updateMany({
       where: {
         opportunityId,
-        externalEventId: { not: normalized.externalEventId },
+        externalId: { not: normalized.externalId },
       },
       data: { opportunityId: null },
     });
@@ -218,10 +285,10 @@ async function upsertIndustryDayFromSam(
   };
 
   return prisma.industryDay.upsert({
-    where: { externalEventId: normalized.externalEventId },
+    where: { externalId: normalized.externalId },
     update: data,
     create: {
-      externalEventId: normalized.externalEventId,
+      externalId: normalized.externalId,
       ...data,
     },
   });
