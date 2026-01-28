@@ -3,7 +3,6 @@ import { searchCategoryFromUsaspending, searchCountFromUsaspending, searchAwardF
 
 const router = express.Router();
 // todo: implement USAspending routes
-// (TIDY todo): port over routes to controllers instead of having logic in routes files
 // Endpoints: 
 
 /** 
