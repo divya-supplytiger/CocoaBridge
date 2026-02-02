@@ -401,12 +401,13 @@ export const getCurrentOpportunitiesFromSam = async (req, res) => {
   try {
     const query = req.query;
 
-    // pull out pagination params
+    // pull out pagination params and cache options
     const { 
       fullSync, 
       maxPages = 10, 
       page, 
       limit = 1000,
+      cacheInDB = 'true', // Default to caching in DB
       ...samQuery 
     } = query;
 
@@ -462,23 +463,26 @@ export const getCurrentOpportunitiesFromSam = async (req, res) => {
     let skipped = 0;
     const errors = [];
 
-    for (const opp of filteredOpportunities) {
-      attempted += 1;
-      if (!opp?.noticeId && !opp?.id) {
-        skipped += 1;
-        continue;
-      }
+    // Only upsert to DB if cacheInDB is true
+    if (cacheInDB === 'true') {
+      for (const opp of filteredOpportunities) {
+        attempted += 1;
+        if (!opp?.noticeId && !opp?.id) {
+          skipped += 1;
+          continue;
+        }
 
-      try {
-        await upsertOpportunityFromSam(prisma, opp);
-        upserted += 1;
-      } catch (e) {
-        skipped += 1;
-        errors.push({
-          noticeId: opp?.noticeId ?? opp?.id ?? null,
-          title: opp?.title ?? null,
-          message: e?.message ?? String(e),
-        });
+        try {
+          await upsertOpportunityFromSam(prisma, opp);
+          upserted += 1;
+        } catch (e) {
+          skipped += 1;
+          errors.push({
+            noticeId: opp?.noticeId ?? opp?.id ?? null,
+            title: opp?.title ?? null,
+            message: e?.message ?? String(e),
+          });
+        }
       }
     }
 
@@ -514,6 +518,7 @@ export const getHistoricalOpportunitiesFromSam = async (req, res) => {
       maxPages = 10,
       page,
       limit = 1000,
+      cacheInDB = 'true', // Default to caching in DB
       ...samQuery
     } = query;
 
@@ -573,24 +578,27 @@ const response = await axios.get(ENV.SAMGOV_BASE_URL, {
     let skipped = 0;
     const errors = [];
 
-    for (const opp of filteredOpportunities) {
-      attempted += 1;
+    // Only upsert to DB if cacheInDB is true
+    if (cacheInDB === 'true') {
+      for (const opp of filteredOpportunities) {
+        attempted += 1;
 
-      if (!opp?.noticeId && !opp?.id) {
-        skipped += 1;
-        continue;
-      }
+        if (!opp?.noticeId && !opp?.id) {
+          skipped += 1;
+          continue;
+        }
 
-      try {
-        await upsertHistoricalOpportunityFromSam(prisma, opp);
-        upserted += 1;
-      } catch (e) {
-        skipped += 1;
-        errors.push({
-          noticeId: opp?.noticeId ?? opp?.id ?? null,
-          title: opp?.title ?? null,
-          message: e?.message ?? String(e),
-        });
+        try {
+          await upsertHistoricalOpportunityFromSam(prisma, opp);
+          upserted += 1;
+        } catch (e) {
+          skipped += 1;
+          errors.push({
+            noticeId: opp?.noticeId ?? opp?.id ?? null,
+            title: opp?.title ?? null,
+            message: e?.message ?? String(e),
+          });
+        }
       }
     }
 
@@ -629,6 +637,7 @@ export const getIndustryDayOpportunitiesFromSam = async (req, res) => {
       maxPages = 10,
       page,
       limit = 1000,
+      cacheInDB = 'true', // Default to caching in DB
       ...samQuery
       } = query;
 
@@ -685,28 +694,31 @@ export const getIndustryDayOpportunitiesFromSam = async (req, res) => {
       let skipped = 0;
       const errors = [];
 
-      for (const opp of filteredOpportunities) {
-        attempted += 1;
+      // Only upsert to DB if cacheInDB is true
+      if (cacheInDB === 'true') {
+        for (const opp of filteredOpportunities) {
+          attempted += 1;
 
-        if (!opp?.noticeId && !opp?.id) {
-          skipped += 1;
-          continue;
-        }
+          if (!opp?.noticeId && !opp?.id) {
+            skipped += 1;
+            continue;
+          }
 
-        try {
-          await prisma.$transaction(async (tx) => {
-            const savedOpp = await upsertOpportunityFromSam(tx, opp);
-            await upsertIndustryDayFromSam(tx, opp, savedOpp.id);
-          }, {timeout: 30000});
-          upserted += 1;
-        } catch (e) {
+          try {
+            await prisma.$transaction(async (tx) => {
+              const savedOpp = await upsertOpportunityFromSam(tx, opp);
+              await upsertIndustryDayFromSam(tx, opp, savedOpp.id);
+            }, {timeout: 30000});
+            upserted += 1;
+          } catch (e) {
 
-          skipped += 1;
-          errors.push({
-            noticeId: opp?.noticeId ?? opp?.id ?? null,
-            title: opp?.title ?? null,
-            message: e?.message ?? String(e),
-          });
+            skipped += 1;
+            errors.push({
+              noticeId: opp?.noticeId ?? opp?.id ?? null,
+              title: opp?.title ?? null,
+              message: e?.message ?? String(e),
+            });
+          }
         }
       }
 
