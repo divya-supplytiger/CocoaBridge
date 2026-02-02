@@ -18,8 +18,102 @@ import {
   normalizeSamRecipient,
 } from "../utils/normalizeSAM.js";
 
+/*
+  Helper functions to fetch opportunities from SAM.gov with pagination
 
-// helper functions
+*/
+// Pagination helper function
+async function fetchAllOpportunitiesFromSam(baseQuery = {}, maxPages = 10) {
+  const allOpportunities = [];
+  let currentPage = 1; // SAM.gov pages start at 1
+  let hasMorePages = true;
+  const limit = 1000; // SAM.gov max limit
+
+  while (hasMorePages && currentPage <= maxPages) {
+    try {
+      console.log(`Fetching page ${currentPage}`);
+      
+      const response = await axios.get(ENV.SAMGOV_BASE_URL, {
+        params: {
+          api_key: ENV.SAMGOV_API_KEY,
+          limit,
+          offset: currentPage, // offset = page number in SAM.gov
+          ...baseQuery,
+        },
+        timeout: 75000,
+      });
+
+      const data = response.data;
+
+
+      const opportunities = data.response?.opportunitiesData || 
+                           data?.opportunitiesData || 
+                           data?.opportunities || 
+                           data?.data || 
+                           [];
+
+      allOpportunities.push(...opportunities);
+
+      // Check if we should continue paginating
+      hasMorePages = opportunities.length === limit; // If we got fewer than limit, we're done
+      currentPage++;
+
+      // Add a small delay to avoid hitting rate limits
+      if (hasMorePages) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+    } catch (error) {
+      console.error(`Error fetching page ${currentPage}:`, error.message);
+      hasMorePages = false; // Stop pagination on error
+    }
+  }
+
+  console.log(`Fetched ${allOpportunities.length} total opportunities across ${currentPage - 1} pages`);
+  return {
+    opportunities: allOpportunities,
+    pagination: {
+      totalPagesFetched: currentPage - 1,
+      totalOpportunities: allOpportunities.length,
+    }
+  };
+}
+
+// Single page fetch helper
+async function fetchOpportunitiesFromSamWithPagination(baseQuery = {}, page = 1, limit = 1000) {
+  const response = await axios.get(ENV.SAMGOV_BASE_URL, {
+    params: {
+      api_key: ENV.SAMGOV_API_KEY,
+      limit: Math.min(limit, 1000), // Ensure we don't exceed SAM.gov limit
+      offset: page, // offset = page number in SAM.gov
+      ...baseQuery,
+    },
+    timeout: 75000,
+  });
+
+  const data = response.data;
+  const opportunities = data.response?.opportunitiesData || 
+                       data?.opportunitiesData || 
+                       data?.opportunities || 
+                       data?.data || 
+                       [];
+
+  return {
+    opportunities,
+    pagination: {
+      page,
+      limit: Math.min(limit, 1000),
+      offset: page, // SAM.gov uses offset as page number
+      count: opportunities.length,
+      hasMore: opportunities.length === Math.min(limit, 1000),
+    }
+  };
+}
+
+/*
+ HELPER FUNCTIONS TO UPSERT DATA INTO DB
+ */
+
 async function upsertContactsForOpportunity(db, samOpportunity, opportunityId) {
   const contacts = extractContact(samOpportunity);
   // 1) Upsert/create the PERSON (Contact)
@@ -140,6 +234,7 @@ async function upsertAwardAndRecipientFromSam(db, samOpportunity, opportunityId)
   });
   return awardRecord;
 };
+
 async function upsertHistoricalOpportunityFromSam(prisma, opportunity) {
   const normalized = normalizeSamHistoricalOpportunity(opportunity);
 
@@ -290,75 +385,112 @@ async function upsertIndustryDayFromSam(
 };
 
 
-// router functions
+/* ROUTER FUNCTIONS */
 export const getCurrentOpportunitiesFromSam = async (req, res) => {
   try {
-        const query  = req.query;
-            const response = await axios.get(ENV.SAMGOV_BASE_URL, {
-              params: {
-                api_key: ENV.SAMGOV_API_KEY,
-                ...query,
-              },
-              timeout: 75000,
-            });
+    const query = req.query;
 
-        const data = response.data;
+    // pull out pagination params
+    const { 
+      fullSync, 
+      maxPages = 10, 
+      page, 
+      limit = 1000,
+      ...samQuery 
+    } = query;
 
-        const opportunities =
-          data.response?.opportunitiesData ||
-          data?.opportunitiesData ||
-          data?.opportunities ||
-          data?.data ||
-          [];
+    let opportunities = [];
+    let paginationInfo = null;
 
-        const filteredOpportunities = opportunities.filter(
-          matchesOpportunitySolicitation,
-        );
 
-        let attempted = 0;
-        let upserted = 0;
-        let skipped = 0;
-        const errors = [];
+    // Fetch opportunities with pagination support
+    if (fullSync === 'true') {
+      // Fetch all pages (for complete sync)
+      const result = await fetchAllOpportunitiesFromSam(samQuery, parseInt(maxPages));
+      opportunities = result.opportunities || [];
+      paginationInfo = result.pagination;
+    } else if (page !== undefined) {
+      // Single page fetch
+      const result = await fetchOpportunitiesFromSamWithPagination(
+        samQuery, 
+        parseInt(page) || 1, // SAM.gov pages start at 1, not 0
+        parseInt(limit)
+      );
+      opportunities = result.opportunities;
+      paginationInfo = result.pagination;
+    } else {
+      // Legacy single request (no pagination)
+      const response = await axios.get(ENV.SAMGOV_BASE_URL, {
+        params: {
+          api_key: ENV.SAMGOV_API_KEY,
+          ...samQuery,
+        },
+        timeout: 75000,
+      });
 
-        for (const opp of filteredOpportunities) {
-          attempted += 1;
-          if (!opp?.noticeId && !opp?.id) {
-            skipped += 1;
-            continue;
-          }
+      const data = response.data;
+      opportunities = data.response?.opportunitiesData ||
+                     data?.opportunitiesData ||
+                     data?.opportunities ||
+                     data?.data ||
+                     [];
+    }
 
-          try {
-            // No transaction wrapper needed here - upsert operations are atomic
-            await upsertOpportunityFromSam(prisma, opp);
-            upserted += 1;
-          } catch (e) {
-            skipped += 1;
-            errors.push({
-              noticeId: opp?.noticeId ?? opp?.id ?? null,
-              title: opp?.title ?? null,
-              message: e?.message ?? String(e),
-            });
-          }
-        }
+    // Ensure opportunities is always an array
+    if (!Array.isArray(opportunities)) {
+      console.warn('Opportunities is not an array:', typeof opportunities, opportunities);
+      opportunities = [];
+    }
 
-        return res.status(200).json({
-          meta: {
-            pulled: opportunities.length,
-            returned: filteredOpportunities.length,
-          },
-          db: { attempted, upserted, skipped, errors },
-          data: {
-            opportunities: filteredOpportunities,
-          },
+    const filteredOpportunities = opportunities.filter(
+      matchesOpportunitySolicitation,
+    );
+
+    let attempted = 0;
+    let upserted = 0;
+    let skipped = 0;
+    const errors = [];
+
+    for (const opp of filteredOpportunities) {
+      attempted += 1;
+      if (!opp?.noticeId && !opp?.id) {
+        skipped += 1;
+        continue;
+      }
+
+      try {
+        await upsertOpportunityFromSam(prisma, opp);
+        upserted += 1;
+      } catch (e) {
+        skipped += 1;
+        errors.push({
+          noticeId: opp?.noticeId ?? opp?.id ?? null,
+          title: opp?.title ?? null,
+          message: e?.message ?? String(e),
         });
+      }
+    }
+
+    const responseData = {
+      meta: {
+        pulled: opportunities.length,
+        returned: filteredOpportunities.length,
+        ...(paginationInfo && { pagination: paginationInfo }),
+      },
+      db: { attempted, upserted, skipped, errors },
+      data: {
+        opportunities: filteredOpportunities,
+      },
+    };
+
+    return res.status(200).json(responseData);
 
   } catch (error) {
-
-        console.error("Error in getCurrentOpportunitiesFromSam controller:", error);
-        res.status(500).json({
-          error: "Internal Server Error -- failed to fetch data from SAM.gov",
-          details: error?.response?.data,
-        });
+    console.error("Error in getCurrentOpportunitiesFromSam controller:", error);
+    res.status(500).json({
+      error: "Internal Server Error -- failed to fetch data from SAM.gov",
+      details: error?.response?.data,
+    });
   }
 };
 
@@ -366,22 +498,60 @@ export const getHistoricalOpportunitiesFromSam = async (req, res) => {
   try {
     const query = req.query;
 
-    console.log(ENV.SAMGOV_BASE_URL);
-    const response = await axios.get(ENV.SAMGOV_BASE_URL, {
-      params: {
-        api_key: ENV.SAMGOV_API_KEY,
-        ...query,
-      },
-      timeout: 75000,
-    });
+    const {
+      fullSync,
+      maxPages = 10,
+      page,
+      limit = 1000,
+      ...samQuery
+    } = query;
 
-    const data = response.data;
-    const opportunities =
-      data.response?.opportunitiesData ||
-      data?.opportunitiesData ||
-      data?.opportunities ||
-      data?.data ||
-      [];
+    let opportunities = [];
+    let paginationInfo = null;
+
+    // fetch opportunities with pagination support
+    if(fullSync === 'true') {
+      // fetch all  pages (for complete sync)
+      const result = await fetchAllOpportunitiesFromSam(samQuery, parseInt(maxPages));
+      opportunities = result.opportunities || [];
+      paginationInfo = result.pagination;
+    
+    } else if (page !== undefined) {
+      // single page fetch
+
+      const result = await fetchOpportunitiesFromSamWithPagination(
+        samQuery,
+        parseInt(page) || 1, // SAM.gov pages start at 1, not 0
+        parseInt(limit)
+      );
+      opportunities = result.opportunities;
+      paginationInfo = result.pagination;
+    } else {
+      // legacy single request (no pagination)
+const response = await axios.get(ENV.SAMGOV_BASE_URL, {
+  params: {
+    api_key: ENV.SAMGOV_API_KEY,
+    ...samQuery,
+  },
+  timeout: 75000,
+  
+});
+      const data = response.data;
+      opportunities = data.response?.opportunitiesData ||
+                     data?.opportunitiesData ||
+                     data?.opportunities ||
+                     data?.data ||
+                     [];
+
+
+    
+                    }
+
+    // Ensure opportunities is always an array
+    if (!Array.isArray(opportunities)) {
+      console.warn('Opportunities is not an array:', typeof opportunities, opportunities);
+      opportunities = [];
+    }
 
     const filteredOpportunities = opportunities.filter(
       matchesOpportunityHistorical,
@@ -401,7 +571,6 @@ export const getHistoricalOpportunitiesFromSam = async (req, res) => {
       }
 
       try {
-        // No transaction wrapper needed here - upsert is atomic
         await upsertHistoricalOpportunityFromSam(prisma, opp);
         upserted += 1;
       } catch (e) {
@@ -414,10 +583,19 @@ export const getHistoricalOpportunitiesFromSam = async (req, res) => {
       }
     }
 
-    return res.status(200).json({ meta: {pulled: opportunities.length,
-       returned: filteredOpportunities.length},
-        db: {attempted, upserted, skipped, errors},
-        data: { opportunities: filteredOpportunities } });
+    const responseData = {
+      meta: {
+        pulled: opportunities.length,
+        returned: filteredOpportunities.length,
+        ...(paginationInfo && { pagination: paginationInfo }),
+    },
+      db: { attempted, upserted, skipped, errors },
+      data: {
+        opportunities: filteredOpportunities,
+      },
+    };
+    
+    return res.status(200).json(responseData);
         
   } catch (error) {
     console.error("Error in getHistoricalOpportunitiesFromSam controller:", error);
@@ -450,6 +628,12 @@ export const getIndustryDayOpportunitiesFromSam = async (req, res) => {
       data?.opportunities ||
       data?.data ||
       [];
+
+    // Ensure opportunities is always an array
+    if (!Array.isArray(opportunities)) {
+      console.warn('Opportunities is not an array:', typeof opportunities, opportunities);
+      opportunities = [];
+    }
 
     const filteredOpportunities = opportunities.filter(
       matchesOpportunityIndustryDay,
