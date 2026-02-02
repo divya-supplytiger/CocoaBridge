@@ -1,9 +1,7 @@
 import { SourceSystem } from "@prisma/client";
 import { toDateOrNull, computeIndustryDayStatus, extractLocation, extractNaicsCodes, extractContact, extractType, extractDescription, extractTag, extractAwardAndRelatedFields} from "./extractSAM.js";
 
-// todo: normalize SAM Opportunity data from SAM API, extract contact info, description, type or baseType, all naics codes or naics code, location
 export const normalizeOpportunity = (opportunity) => {
-
     const noticeId = opportunity?.noticeId || opportunity?.id || null;
     const solicitationNumber = opportunity?.solicitationNumber || null;
     const title = opportunity?.title || "No Title";

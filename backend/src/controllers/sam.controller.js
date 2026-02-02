@@ -125,6 +125,8 @@ async function fetchOpportunitiesFromSamWithPagination(baseQuery = {}, page = 1,
  HELPER FUNCTIONS TO UPSERT DATA INTO DB
  */
 
+ // TODO: Get organization and upsert as well
+
 async function upsertContactsForOpportunity(db, samOpportunity, opportunityId) {
   const contacts = extractContact(samOpportunity);
   // 1) Upsert/create the PERSON (Contact)
@@ -772,10 +774,11 @@ export const getOpportunityDescriptionFromSam = async (req, res) => {
 
     // TODO: implement description parsing logic (remove html, etc.)
     // const filteredDescription = parseDescription(description);
+    // and capture details that match our criteria
 
     // Cache the description in the database
     // given that caching is requested
-    const cacheInDB = req.query.cache === 'true';
+    const cacheInDB = req.query.cache === "true";
     if (cacheInDB && description) {
       await prisma.opportunity.updateMany({
         where: { noticeId },
@@ -786,9 +789,8 @@ export const getOpportunityDescriptionFromSam = async (req, res) => {
     return res.status(200).json({
       noticeId,
       description,
-      cached: cacheInDB && description ? true : false, 
+      cached: cacheInDB && description ? true : false,
     });
-
   } catch (error) {
     console.error("Error in getOpportunityDescriptionFromSam controller:", error);
     
@@ -805,8 +807,3 @@ export const getOpportunityDescriptionFromSam = async (req, res) => {
     });
   }
 };
-// todo: take opportunities marked as "AWARDED" and fill in award data in the awards table
-// TODO: implement pagination handling for large result sets
-// TODO: Cache description into db --> 
-// description: https://api.sam.gov/prod/opportunities/v1/noticedesc?noticeid=ab59e24aa7a143378601cee95947dd64&api_key=YOUR_API_KEY
-// and capture details that match our criteria
