@@ -223,6 +223,8 @@ model Award {
 
   externalId String? @unique
 
+  description String?
+
   naicsCodes String[] @default([])
   pscCode    String?
 

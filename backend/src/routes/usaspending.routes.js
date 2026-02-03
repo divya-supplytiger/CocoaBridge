@@ -1,11 +1,17 @@
 import express from "express";
-import { searchCategoryFromUsaspending, searchCountFromUsaspending, searchAwardFromUsaspending, getAwardByIdFromUsaspending } from "../controllers/usaspending.controller.js";  
+import {
+  searchCategoryFromUsaspending,
+  searchCountFromUsaspending,
+  searchAwardFromUsaspending,
+  getAwardByIdFromUsaspending,
+  syncAwardsFromUsaspending,
+} from "../controllers/usaspending.controller.js";
 
 const router = express.Router();
 // todo: implement USAspending routes
-// Endpoints: 
+// Endpoints:
 
-/** 
+/**
  * PING endpoint for testing
  */
 router.post("/ping", (req, res) => {
@@ -75,7 +81,7 @@ router.post("/ping", (req, res) => {
 router.post("/search-award", searchAwardFromUsaspending);
 
 // Endpoint B: /api/v2/search/spending_by_award_count/
-/* 
+/*
  * POST /api/usaspending/search-count
  * /
  * Example Body:
@@ -95,20 +101,20 @@ router.post("/search-award", searchAwardFromUsaspending);
 router.post("/search-count", searchCountFromUsaspending);
 
 // Endpoint C: /api/v2/search/spending_by_category/
-/* 
+/*
  * POST /api/usaspending/search-category
- * / 
- * 
+ * /
+ *
  * Purpose:
  * - Returns aggregated spending grouped by a specific category
  * - Used for geographic, organizational, and categorical analysis
  * - Supports high-level market sizing and trend exploration
- * 
+ *
  *  Notes:
  * - `category` is removed from the payload and used in the URL path
  * - Filters follow the standard USAspending Advanced Search schema
  * - Response is returned verbatim from USAspending
- * 
+ *
  * Example Body:
  * {
  *   "category": "state_territory",
@@ -123,15 +129,47 @@ router.post("/search-count", searchCountFromUsaspending);
  *   "limit": 100,
  *   "page": 1
  * }
- * 
- * 
+ *
+ *
  * */
 router.post("/search-category", searchCategoryFromUsaspending);
 
 // Endpoint D: /api/v2/awards/{award_id}/
 router.get("/award/:award_id", getAwardByIdFromUsaspending);
 
+// Endpoint E: Sync Awards to Database
+/**
+ * POST /api/usaspending/sync-awards
+ *
+ * Fetches awards from USASpending and upserts them to the database.
+ * Uses the same filter schema as /search-award.
+ *
+ * Additional params:
+ * - syncAll: boolean - If true, paginates through all results
+ * - limit: number - Page size (default 100)
+ * - page: number - Starting page (default 1)
+ *
+ * Example body:
+ * {
+ *   "syncAll": false,
+ *   "limit": 50,
+ *   "filters": {
+ *     "time_period": [{ "start_date": "2024-01-01", "end_date": "2025-01-31" }],
+ *     "naics_codes": ["424450"]
+ *   },
+ *   "fields": [
+ *     "Award ID", "Recipient Name", "Award Amount", "Description",
+ *     "Contract Award Type", "Recipient UEI", "Recipient Location",
+ *     "Primary Place of Performance", "Awarding Agency", "Awarding Sub Agency",
+ *     "Start Date", "End Date", "NAICS", "PSC", "recipient_id",
+ *     "awarding_agency_id", "generated_internal_id"
+ *   ],
+ *   "spending_level": "awards"
+ * }
+ */
+router.post("/sync-awards", syncAwardsFromUsaspending);
+
 // TODO: Optional Endpoint (add if needed):
-// Endpoint E: /api/v2/agency/<TOPTIER_AGENCY_CODE>/sub_agency/
+// Endpoint F: /api/v2/agency/<TOPTIER_AGENCY_CODE>/sub_agency/
 
 export default router;
