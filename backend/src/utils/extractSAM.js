@@ -1,5 +1,18 @@
-import { classificationPrefixes, naicsPrefixes, validCountries, industryDayTitleKeywords, solicitationTitleKeywords } from "./globals.js";
-import  { IndustryDayStatus, ContactType, Type, OppTag, SourceSystem } from "@prisma/client";
+import {
+  classificationPrefixes,
+  naicsPrefixes,
+  validCountries,
+  industryDayTitleKeywords,
+  solicitationTitleKeywords,
+} from "./globals.js";
+import {
+  IndustryDayStatus,
+  ContactType,
+  Type,
+  OppTag,
+  SourceSystem,
+} from "@prisma/client";
+import { JSDOM } from "jsdom";
 /*
                 "pointOfContact": [
                     {
@@ -62,39 +75,46 @@ export const extractContact = (opportunity) => {
 
 export const extractType = (opportunity) => {
   const typeField = opportunity?.type || opportunity?.baseType || null;
-  if(typeField?.includes("Pre")) return Type.PRE_SOLICITATION;
-  if(typeField?.includes("Award")) return Type.AWARD_NOTICE;
-  if(typeField?.includes("Source")) return Type.SOURCES_SOUGHT;
-  if(typeField?.includes("Special")) return Type.SPECIAL_NOTICE;
-  if(typeField?.includes("Solicitation")) return Type.SOLICITATION;
+  if (typeField?.includes("Pre")) return Type.PRE_SOLICITATION;
+  if (typeField?.includes("Award")) return Type.AWARD_NOTICE;
+  if (typeField?.includes("Source")) return Type.SOURCES_SOUGHT;
+  if (typeField?.includes("Special")) return Type.SPECIAL_NOTICE;
+  if (typeField?.includes("Solicitation")) return Type.SOLICITATION;
   return Type.OTHER;
 };
 
 export const extractAwardAndRelatedFields = (opportunity) => {
-    const awardItem = opportunity?.award || null;
-    if(!awardItem) return null;
+  const awardItem = opportunity?.award || null;
+  if (!awardItem) return null;
 
-    const award = {
-      externalId: awardItem.number || null,
-      obligatedAmount: awardItem.amount ? Number(awardItem.amount) : 0,
-      startDate: toDateOrNull(awardItem.date),
-      // end date is not available in the current data structure
-    }
-
-    const recipient = awardItem.awardee;
-
-    return { award, recipient };
+  const award = {
+    externalId: awardItem.number || null,
+    obligatedAmount: awardItem.amount ? Number(awardItem.amount) : 0,
+    startDate: toDateOrNull(awardItem.date),
+    // end date is not available in the current data structure
   };
 
-// todo: implement description extraction logic with api call later
-export const extractDescription = (opportunity) => {
-    return opportunity?.description || null;
+  const recipient = awardItem.awardee;
+
+  return { award, recipient };
+};
+
+export const stripHTML = (htmlString) => {
+  if (!htmlString) return null;
+  const dom = new JSDOM(htmlString);
+  const textContent = dom.window.document.body.textContent || null;
+  return textContent ? String(textContent).trim() : null;
 };
 
 export const extractTag = (opportunity) => {
-  const title = opportunity?.title ? String(opportunity.title).toLowerCase() : "";
-  const industryDayKeywords = titleMatchesKeyword(title, industryDayTitleKeywords);
-  if(industryDayKeywords) return OppTag.INDUSTRY_DAY;
+  const title = opportunity?.title
+    ? String(opportunity.title).toLowerCase()
+    : "";
+  const industryDayKeywords = titleMatchesKeyword(
+    title,
+    industryDayTitleKeywords,
+  );
+  if (industryDayKeywords) return OppTag.INDUSTRY_DAY;
   return OppTag.GENERAL;
 };
 
@@ -117,85 +137,90 @@ export const computeIndustryDayStatus = (eventDate) => {
 
 // Check if a value starts with any of the given prefixes
 export const startsWithAny = (value, prefixes = []) => {
-    if(value === null || value === undefined) return false;
+  if (value === null || value === undefined) return false;
 
-    const s = String(value).trim();
-    return prefixes.some((p) => s.startsWith(String(p)));
+  const s = String(value).trim();
+  return prefixes.some((p) => s.startsWith(String(p)));
 };
 
 // Check if a title indicates an industry day or similar event
 export const titleMatchesKeyword = (title, keywords) => {
-    if(!title) return false;
-    const t = String(title).toLowerCase();
-    const matches = keywords.some((kw) => t.includes(String(kw).toLowerCase()));
-    return matches;
+  if (!title) return false;
+  const t = String(title).toLowerCase();
+  const matches = keywords.some((kw) => t.includes(String(kw).toLowerCase()));
+  return matches;
 };
 
 export const isValidCountry = (code) => {
-    if(!code) return false;
-    const c = String(code).trim().toUpperCase();
-    return validCountries.includes(c);
+  if (!code) return false;
+  const c = String(code).trim().toUpperCase();
+  return validCountries.includes(c);
 };
 
 export const extractCountry = (item) => {
-    const countryFields = [];
-    if(item?.placeOfPerformance?.country) countryFields.push(String(item.placeOfPerformance.country.code).trim());
-    if(item?.officeAddress?.country) countryFields.push(String(item.officeAddress.countryCode).trim());
-    return [...new Set(countryFields.map((x) => x.trim()).filter(Boolean))];
+  const countryFields = [];
+  if (item?.placeOfPerformance?.country)
+    countryFields.push(String(item.placeOfPerformance.country.code).trim());
+  if (item?.officeAddress?.country)
+    countryFields.push(String(item.officeAddress.countryCode).trim());
+  return [...new Set(countryFields.map((x) => x.trim()).filter(Boolean))];
 };
 
 // Extract NAICS codes from a SAM.gov item
 export const extractNaicsCodes = (item) => {
-    // SAM.gov items may have NAICS codes in different fields
-    const out = [];
-    if(item?.naicsCode) out.push(String(item.naicsCode).trim());
-    if(Array.isArray(item?.naicsCodes)) {
-        item.naicsCodes.forEach((code) => {
-            if(code)out.push(String(code).trim());
-        });
-    }
-    // de-duplicate
-    return [...new Set(out.map((x) => x.trim()).filter(Boolean))];
-
+  // SAM.gov items may have NAICS codes in different fields
+  const out = [];
+  if (item?.naicsCode) out.push(String(item.naicsCode).trim());
+  if (Array.isArray(item?.naicsCodes)) {
+    item.naicsCodes.forEach((code) => {
+      if (code) out.push(String(code).trim());
+    });
+  }
+  // de-duplicate
+  return [...new Set(out.map((x) => x.trim()).filter(Boolean))];
 };
 
 // Extract location string from SAM.gov item (for events)
 // TODO: improve location accuracy
 export const extractLocation = (opportunity) => {
-   const locationParts = opportunity?.officeAddress
-     ? [
-         opportunity?.officeAddress?.city,
-         opportunity?.officeAddress?.state,
-         opportunity?.officeAddress?.zipcode,
-         opportunity?.officeAddress?.countryCode,
-       ].filter(Boolean)
-     : opportunity?.placeOfPerformance
-       ? [
-           opportunity?.placeOfPerformance?.city?.name,
-           opportunity?.placeOfPerformance?.state?.name,
-           opportunity?.placeOfPerformance?.zip,
-           opportunity?.placeOfPerformance?.country?.code,
-         ].filter(Boolean)
-       : [];
+  const locationParts = opportunity?.officeAddress
+    ? [
+        opportunity?.officeAddress?.city,
+        opportunity?.officeAddress?.state,
+        opportunity?.officeAddress?.zipcode,
+        opportunity?.officeAddress?.countryCode,
+      ].filter(Boolean)
+    : opportunity?.placeOfPerformance
+      ? [
+          opportunity?.placeOfPerformance?.city?.name,
+          opportunity?.placeOfPerformance?.state?.name,
+          opportunity?.placeOfPerformance?.zip,
+          opportunity?.placeOfPerformance?.country?.code,
+        ].filter(Boolean)
+      : [];
 
-    return locationParts.length ? locationParts.join(", ") : null;
+  return locationParts.length ? locationParts.join(", ") : null;
 };
 
 export const matchesOpportunityIndustryDay = (item) => {
-    
-    const titleMatch = titleMatchesKeyword(item?.title, industryDayTitleKeywords);
+  const titleMatch = titleMatchesKeyword(item?.title, industryDayTitleKeywords);
 
-    const countryCodes = extractCountry(item);
-    const countryMatch = countryCodes.length === 0 ? true: countryCodes.some(isValidCountry);
+  const countryCodes = extractCountry(item);
+  const countryMatch =
+    countryCodes.length === 0 ? true : countryCodes.some(isValidCountry);
 
+  const naicsCodes = extractNaicsCodes(item);
+  const naicsMatch = naicsCodes.some((code) =>
+    startsWithAny(code, naicsPrefixes),
+  );
+  const classificiationMatch = startsWithAny(
+    item?.classificationCode,
+    classificationPrefixes,
+  );
 
-    const naicsCodes = extractNaicsCodes(item);
-    const naicsMatch = naicsCodes.some((code) => startsWithAny(code, naicsPrefixes));
-    const classificiationMatch = startsWithAny(item?.classificationCode, classificationPrefixes);
-
-    // Return true if any criteria match
-    return (titleMatch || naicsMatch || classificiationMatch) && countryMatch;
-}
+  // Return true if any criteria match
+  return (titleMatch || naicsMatch || classificiationMatch) && countryMatch;
+};
 
 export const matchesOpportunitySolicitation = (item) => {
   const titleMatch = titleMatchesKeyword(
@@ -220,19 +245,23 @@ export const matchesOpportunitySolicitation = (item) => {
   return (titleMatch || naicsMatch || classificiationMatch) && countryMatch;
 };
 
-
 export const matchesOpportunityHistorical = (item) => {
+  const titleMatch = titleMatchesKeyword(
+    item?.title,
+    solicitationTitleKeywords,
+  );
+  const countryCodes = extractCountry(item);
+  const countryMatch =
+    countryCodes.length === 0 ? true : countryCodes.some(isValidCountry);
 
-      const titleMatch = titleMatchesKeyword(
-        item?.title,
-        solicitationTitleKeywords,
-      );
-    const countryCodes = extractCountry(item);
-    const countryMatch = countryCodes.length === 0 ? true: countryCodes.some(isValidCountry);
+  const naicsCodes = extractNaicsCodes(item);
+  const naicsMatch = naicsCodes.some((code) =>
+    startsWithAny(code, naicsPrefixes),
+  );
+  const classificiationMatch = startsWithAny(
+    item?.classificationCode,
+    classificationPrefixes,
+  );
 
-    const naicsCodes = extractNaicsCodes(item);
-    const naicsMatch = naicsCodes.some((code) => startsWithAny(code, naicsPrefixes));
-    const classificiationMatch = startsWithAny(item?.classificationCode, classificationPrefixes);
-
-    return (titleMatch || naicsMatch || classificiationMatch) && countryMatch;
-}
+  return (titleMatch || naicsMatch || classificiationMatch) && countryMatch;
+};

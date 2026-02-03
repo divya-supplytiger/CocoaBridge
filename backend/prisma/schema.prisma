@@ -230,6 +230,7 @@ model Award {
   startDate       DateTime?
   endDate         DateTime?
 
+  // TODO: Ensure that award is inherantly linked
   opportunityId String?
   opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
 
