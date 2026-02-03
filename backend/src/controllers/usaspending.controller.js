@@ -7,6 +7,8 @@ import {
   extractAwardingOrgsFromUSASpending,
 } from "../utils/normalizeUSASpending.js";
 
+import { usaSpendingFilters } from "../utils/globals.js";
+
 /* 
 HELPER FUNCTIONS TO UPSERT DATA
 */
@@ -247,6 +249,7 @@ export const searchAwardFromUsaspending = async (req, res) => {
   }
 };
 
+// Stats about counts of different award types (can be applicable later for aggregations)
 export const searchCountFromUsaspending = async (req, res) => {
   try {
     const response = await axios.post(
@@ -367,10 +370,56 @@ export const getAwardByIdFromUsaspending = async (req, res) => {
  *
  * Supports pagination via `page` and `limit` params.
  * Set `syncAll: true` to paginate through all results.
+ *
+ * Query params:
+ * - preset: string - Use a preset filter (e.g., "allAwards", "microtransactions", "smallBusiness")
+ * - syncAll: boolean - If true, paginate through all results
+ *
+ * If no preset is specified, uses the request body as filters.
  */
 export const syncAwardsFromUsaspending = async (req, res) => {
   try {
-    const { syncAll = false, limit = 100, page = 1, ...filters } = req.body;
+    const { preset, syncAll: syncAllParam } = req.query;
+
+    // Determine filters: use preset or body
+    let filters;
+    let limit = 100;
+    let page = 1;
+    let syncAll = syncAllParam === "true";
+
+    if (preset) {
+      // Use preset filter from globals
+      const presetFilter = usaSpendingFilters.searchByAward?.[preset];
+      if (!presetFilter) {
+        return res.status(400).json({
+          error: `Invalid preset: "${preset}"`,
+          availablePresets: Object.keys(usaSpendingFilters.searchByAward || {}),
+        });
+      }
+      filters = presetFilter;
+      limit = presetFilter.limit || 100;
+      page = presetFilter.page || 1;
+    } else {
+      // Use request body
+      const {
+        syncAll: bodySyncAll,
+        limit: bodyLimit = 100,
+        page: bodyPage = 1,
+        ...bodyFilters
+      } = req.body;
+      filters = bodyFilters;
+      limit = bodyLimit;
+      page = bodyPage;
+      syncAll = bodySyncAll || syncAll;
+    }
+
+    if (!filters || Object.keys(filters).length === 0) {
+      return res.status(400).json({
+        error:
+          "No filters provided. Use a preset or provide filters in the request body.",
+        availablePresets: Object.keys(usaSpendingFilters.searchByAward || {}),
+      });
+    }
 
     let currentPage = page;
     let attempted = 0;
@@ -435,6 +484,7 @@ export const syncAwardsFromUsaspending = async (req, res) => {
     return res.status(200).json({
       message: "Sync completed",
       meta: {
+        preset: preset || null,
         total: totalRecords,
         returned: allAwards.length,
         pagesProcessed: currentPage - page,
