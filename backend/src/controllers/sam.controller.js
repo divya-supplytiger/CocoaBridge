@@ -2,7 +2,11 @@ import { SourceSystem } from "@prisma/client";
 import { ENV } from "../config/env.js";
 import axios from "axios";
 import prisma from "../config/db.js";
-import { extractContact, stripHTML } from "../utils/extractSAM.js";
+import {
+  extractContact,
+  extractOrganizationChain,
+  stripHTML,
+} from "../utils/extractSAM.js";
 
 import {
   matchesOpportunityIndustryDay,
@@ -131,9 +135,49 @@ async function fetchOpportunitiesFromSamWithPagination(
  HELPER FUNCTIONS TO UPSERT DATA INTO DB
  */
 
-// TODO: Get organization and upsert as well
+/**
+ * Upsert organization hierarchy from SAM opportunity.
+ * Returns the leaf (most specific) organization ID to link to the opportunity.
+ */
+async function upsertOrganizationChainFromSam(db, samOpportunity) {
+  const chain = extractOrganizationChain(samOpportunity);
 
-async function upsertContactsForOpportunity(db, samOpportunity, opportunityId) {
+  if (chain.length === 0) return null;
+
+  let parentId = null;
+
+  for (const org of chain) {
+    // Use name as primary key since SAM codes can be inconsistent
+    const upserted = await db.buyingOrganization.upsert({
+      where: { name: org.name },
+      update: {
+        level: org.level,
+        pathName: org.pathName,
+        externalId: org.externalId, // Update code if it changed
+        parentId,
+      },
+      create: {
+        name: org.name,
+        externalId: org.externalId,
+        level: org.level,
+        pathName: org.pathName,
+        parentId,
+      },
+    });
+
+    parentId = upserted.id;
+  }
+
+  // Return the leaf organization ID (last in chain)
+  return parentId;
+}
+
+async function upsertContactsForOpportunity(
+  db,
+  samOpportunity,
+  opportunityId,
+  buyingOrganizationId = null,
+) {
   const contacts = extractContact(samOpportunity);
 
   if (contacts.length === 0) {
@@ -194,6 +238,7 @@ async function upsertContactsForOpportunity(db, samOpportunity, opportunityId) {
           type: c.type,
           source: c.source,
           contactId: contact.id,
+          buyingOrganizationId,
         },
         create: {
           opportunityId,
@@ -201,6 +246,7 @@ async function upsertContactsForOpportunity(db, samOpportunity, opportunityId) {
           type: c.type,
           source: c.source,
           contactId: contact.id,
+          buyingOrganizationId,
         },
       });
     } catch (error) {
@@ -275,7 +321,14 @@ async function upsertHistoricalOpportunityFromSam(prisma, opportunity) {
     throw new Error("Missing noticeId for Historical Opportunity upsert");
   }
 
+  // Upsert organization hierarchy and get the leaf org ID
+  const buyingOrganizationId = await upsertOrganizationChainFromSam(
+    prisma,
+    opportunity,
+  );
+
   const data = {
+    buyingOrganizationId,
     source: SourceSystem.SAM,
 
     noticeId: normalized.noticeId,
@@ -312,7 +365,12 @@ async function upsertHistoricalOpportunityFromSam(prisma, opportunity) {
   }
 
   // Upsert contacts for historical opportunities too
-  await upsertContactsForOpportunity(prisma, opportunity, opp.id);
+  await upsertContactsForOpportunity(
+    prisma,
+    opportunity,
+    opp.id,
+    buyingOrganizationId,
+  );
 
   return opp;
 }
@@ -324,7 +382,14 @@ async function upsertOpportunityFromSam(prisma, opportunity) {
     throw new Error("Missing noticeId for Opportunity upsert");
   }
 
+  // Upsert organization hierarchy and get the leaf org ID
+  const buyingOrganizationId = await upsertOrganizationChainFromSam(
+    prisma,
+    opportunity,
+  );
+
   const data = {
+    buyingOrganizationId,
     source: SourceSystem.SAM,
 
     noticeId: normalized.noticeId,
@@ -359,15 +424,18 @@ async function upsertOpportunityFromSam(prisma, opportunity) {
     create: data,
   });
 
-  // NEW: Upsert award and recipient associated with this opportunity
+  // Upsert award and recipient associated with this opportunity
   if (opportunity?.award?.number) {
-    // IMPORTANT: don't upsert if you don't have a unique key
-    if (!opportunity?.award?.number) return null;
     await upsertAwardAndRecipientFromSam(prisma, opportunity, opp.id);
   }
 
   // Upsert contacts associated with this opportunity
-  await upsertContactsForOpportunity(prisma, opportunity, opp.id);
+  await upsertContactsForOpportunity(
+    prisma,
+    opportunity,
+    opp.id,
+    buyingOrganizationId,
+  );
   return opp;
 }
 

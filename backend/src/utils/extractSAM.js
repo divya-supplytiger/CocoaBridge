@@ -11,8 +11,63 @@ import {
   Type,
   OppTag,
   SourceSystem,
+  OrgLevel,
 } from "@prisma/client";
 import { JSDOM } from "jsdom";
+
+/*
+  Extract organization hierarchy from SAM opportunity.
+  
+  fullParentPathName: "DEPT OF DEFENSE.DEPT OF THE NAVY.NAVSEA.NAVSEA WARFARE CENTER.NAVAL UNDERSEA WARFARE CENTER"
+  fullParentPathCode: "017.1700.NAVSEA.NAVSEA WARFARE CTR.N00253"
+  
+  Returns array of orgs from root to leaf, each with:
+  { name, externalId, level, pathName }
+*/
+export const extractOrganizationChain = (opportunity) => {
+  const pathName = opportunity?.fullParentPathName;
+  const pathCode = opportunity?.fullParentPathCode;
+
+  if (!pathName) return [];
+
+  const names = pathName
+    .split(".")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const codes = pathCode ? pathCode.split(".").map((s) => s.trim()) : [];
+
+  const chain = names.map((name, index) => {
+    const code = codes[index] || null;
+
+    // Determine org level based on position in hierarchy
+    let level;
+    if (index === 0) {
+      level = OrgLevel.AGENCY;
+    } else if (index === 1) {
+      level = OrgLevel.SUBAGENCY;
+    } else if (index === names.length - 1) {
+      // Last item is typically the office
+      level = OrgLevel.OFFICE;
+    } else {
+      level = OrgLevel.OTHER;
+    }
+
+    // Build cumulative path for this level
+    const cumulativePath = names.slice(0, index + 1).join(".");
+
+    return {
+      name,
+      externalId: code
+        ? `SAM:${code}`
+        : `SAM:${name.replace(/\s+/g, "_").toUpperCase()}`,
+      level,
+      pathName: cumulativePath,
+    };
+  });
+
+  return chain;
+};
+
 /*
                 "pointOfContact": [
                     {
