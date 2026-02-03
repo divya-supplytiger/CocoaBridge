@@ -1,167 +1,204 @@
-import {SourceSystem} from "@prisma/client";
+import { SourceSystem, OrgLevel } from "@prisma/client";
+import { parse } from "path";
 
-/* Structure of an Opportunity */
-/* model Opportunity {
-  id     String       @id @default(cuid())
-  source SourceSystem @default(SAM)
+/**
+ * Extracts and combines description from USASpending award.
+ * Combines Description, NAICS.description, and PSC.description with proper spacing.
+ *
+ * @param {Object} usaAward - Raw award from USASpending API
+ * @returns {string|null} Combined description or null
+ */
+export const extractDescriptionFromUSASpending = (usaAward) => {
+  if (!usaAward) return null;
 
-  // Dedup for SAM
-  noticeId           String? @unique
-  solicitationNumber String?
-  title              String?
-  type               Type?
-  tag                OppTag  @default(GENERAL)
-  active             Boolean @default(true)
+  const parts = [];
 
-  description String?
+  // Main description (clean up leading numbers/special chars)
+  const mainDesc = usaAward.Description || usaAward.description || null;
+  if (mainDesc) {
+    // Remove leading patterns like "4561727484!" or similar
+    const cleaned = String(mainDesc)
+      .replace(/^[\d!]+/, "")
+      .trim();
+    if (cleaned) parts.push(cleaned);
+  }
 
-  postedDate       DateTime?
-  responseDeadline DateTime?
+  // NAICS description
+  const naicsDesc = usaAward.NAICS?.description || null;
+  if (naicsDesc) {
+    parts.push(`NAICS: ${naicsDesc}`);
+  }
 
-  // Classification
-  naicsCodes String[] @default([])
-  pscCode    String?
-  setAside   String? // store raw like "NONE", "SBA", etc.
+  // PSC description
+  const pscDesc = usaAward.PSC?.description || null;
+  if (pscDesc) {
+    parts.push(`PSC: ${pscDesc}`);
+  }
 
-  // Org / office metadata
-  fullParentPathName String?
-  city               String?
-  state              String?
-  zip                String?
-  countryCode        String?
+  return parts.length > 0 ? parts.join(" | ") : null;
+};
 
-  // Relationships
-  organizationId String?
-  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+/**
+ * Normalizes a USASpending award object into the shape needed for our Award model.
+ *
+ * @param {Object} usaAward - Raw award from USASpending API
+ * @returns {Object} Normalized award data
+ */
+export const normalizeUSASpendingAward = (usaAward) => {
+  if (!usaAward) return null;
 
-  // Inbox workflow
-  inboxItems InboxItem[]
+  // Use generated_internal_id as the unique externalId (most reliable for deduplication)
+  const externalId =
+    usaAward.generated_internal_id || usaAward["Award ID"] || null;
 
-  // Contacts scraped from SAM for this opportunity (optional but useful)
-  contactLinks ContactLink[]
+  // Parse dates
+  const parseDate = (dateStr) => {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    return isNaN(date.getTime()) ? null : date;
+  };
+  const startDate = parseDate(usaAward["Start Date"]);
+  const endDate = parseDate(usaAward["End Date"]);
 
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  industryDay IndustryDay?
+  // Parse obligated amount - handle currency format like "$1,234.56"
+  let obligatedAmount = null;
+  if (usaAward["Award Amount"] != null) {
+    const amountStr = String(usaAward["Award Amount"]).replace(/[$,]/g, "");
+    const parsed = parseFloat(amountStr);
+    if (!isNaN(parsed)) {
+      obligatedAmount = parsed;
+    }
+  }
 
-  @@index([postedDate])
-  @@index([responseDeadline])
-  @@index([naicsCodes], type: Gin)
-  @@index([pscCode])
-  @@index([type])
-  @@index([solicitationNumber])
-  @@index([title])
-} */
+  // NAICS and PSC
+  const naicsCodes = usaAward.NAICS?.code ? [usaAward.NAICS.code] : [];
+  const pscCode = usaAward.PSC?.code || null;
 
-/* Structure of an Award */
-/* model Award {
-  id     String       @id @default(cuid())
-  source SourceSystem @default(USASPENDING)
+  const description = extractDescriptionFromUSASpending(usaAward);
 
-  externalAwardId String? @unique
-  awardingAgency  String?
-  awardingOffice  String?
+  return {
+    source: SourceSystem.USASPENDING,
+    externalId,
+    description,
+    naicsCodes,
+    pscCode,
+    obligatedAmount,
+    startDate,
+    endDate,
+  };
+};
 
-  naicsCodes String[] @default([])
-  pscCode    String?
+/**
+ * Extracts recipient data from a USASpending award.
+ *
+ * @param {Object} usaAward - Raw award from USASpending API
+ * @returns {Object|null} Recipient data or null if not available
+ */
+export const extractRecipientFromUSASpending = (usaAward) => {
+  if (!usaAward) return null;
 
-  obligatedAmount Decimal?  @db.Decimal(18, 2)
-  startDate       DateTime?
-  endDate         DateTime?
+  // USASpending uses "Recipient Name" and "Recipient UEI" field names
+  const name =
+    usaAward["Recipient Name"] ||
+    usaAward.Recipient ||
+    usaAward.recipient_name ||
+    null;
+  const uei = usaAward["Recipient UEI"] || usaAward.recipient_uei || null;
 
-  organizationId String?
-  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  // If no name and no UEI, we can't create a recipient
+  if (!name && !uei) return null;
 
-  inboxItems InboxItem[]
+  return {
+    name: name || "Unknown Recipient",
+    uei,
+    website: null, // USASpending doesn't provide this
+  };
+};
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+/**
+ * Extracts the awarding organization chain from a USASpending award.
+ * Returns an array of orgs from parent (Agency) to child (Sub Agency).
+ *
+ * @param {Object} usaAward - Raw award from USASpending API
+ * @returns {Array} Array of organization objects in parent-to-child order
+ */
+export const extractAwardingOrgsFromUSASpending = (usaAward) => {
+  if (!usaAward) return [];
 
-  @@index([startDate])
-  @@index([endDate])
-  @@index([naicsCodes], type: Gin)
-  @@index([pscCode])
-} */
+  const orgs = [];
 
-/* Structure of a normalized USAspending Award object:
-*/
-/*
-    {
-        "internal_id": 353122771,
-        "Award ID": "15B11426P00000008",
-        "Recipient Name": "UNION SUPPLY GROUP, INC.",
-        "Award Amount": 15680,
-        "Description": "FY 26 HOLIDAY BAGS C5",
-        "Contract Award Type": "PURCHASE ORDER",
-        "Recipient UEI": "DXM9X66ZLR61",
-        "Recipient Location": {
-        "location_country_code": "USA",
-        "country_name": "UNITED STATES",
-        "state_code": "TX",
-        "state_name": "Texas",
-        "city_name": "DALLAS",
-        "county_code": "113",
-        "county_name": "DALLAS",
-        "address_line1": "2500 REGENT BLVD",
-        "address_line2": null,
-        "address_line3": null,
-        "congressional_code": "24",
-        "zip4": "4401",
-        "zip5": "75261",
-        "foreign_postal_code": null,
-        "foreign_province": null
-        },
-        "Primary Place of Performance": {
-            "location_country_code": "USA",
-            "country_name": "UNITED STATES",
-            "state_code": "VA",
-            "state_name": "Virginia",
-            "city_name": "HOPEWELL",
-            "county_code": "670",
-            "county_name": "HOPEWELL CITY",
-            "congressional_code": "04",
-            "zip4": "238605900",
-            "zip5": "23860"
-        },
-            "def_codes": null,
-            "Awarding Agency": "Department of Justice",
-            "Awarding Sub Agency": "Federal Prison System / Bureau of Prisons",
-            "Start Date": "2025-11-24",
-            "End Date": "2025-11-24",
-            "NAICS": {
-                "code": "424450",
-                "description": "CONFECTIONERY MERCHANT WHOLESALERS"
-            },
-            "PSC": {
-                "code": "8925",
-                "description": "SUGAR, CONFECTIONERY, AND NUTS"
-            },
-            "recipient_id": "b48bbdf1-ac73-bc80-98a4-dd8a0f22a94f-C",
-            "prime_award_recipient_id": null,
-            "awarding_agency_id": 252,
-            "agency_slug": "department-of-justice",
-            "generated_internal_id": "CONT_AWD_15B11426P00000008_1540_-NONE-_-NONE-"
-        },
-    */
-        
-/* model Organization {
-  id       String  @id @default(cuid())
-  name     String
-  uei      String? @unique
-  cageCode String?
-  website  String?
+  // Parent: Awarding Agency
+  const agencyName = usaAward["Awarding Agency"];
+  const agencyId = usaAward.awarding_agency_id
+    ? String(usaAward.awarding_agency_id)
+    : null;
 
-  contactLinks ContactLink[]
+  if (agencyName) {
+    orgs.push({
+      name: agencyName,
+      externalId: agencyId,
+      level: OrgLevel.AGENCY,
+    });
+  }
 
-  inboxItems    InboxItem[]
-  awards        Award[]
-  industryDay   IndustryDay[]
-  opportunities Opportunity[]
+  // Child: Awarding Sub Agency
+  const subAgencyName = usaAward["Awarding Sub Agency"];
+  if (subAgencyName && subAgencyName !== agencyName) {
+    // Generate a pseudo-externalId for sub-agency if not available
+    // This helps with deduplication
+    const subAgencyExternalId = agencyId
+      ? `${agencyId}-SUB-${subAgencyName.replace(/\s+/g, "_")}`
+      : null;
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+    orgs.push({
+      name: subAgencyName,
+      externalId: subAgencyExternalId,
+      level: OrgLevel.SUBAGENCY,
+    });
+  }
 
-  @@index([name])
-  @@index([cageCode])
-}
-  */
+  return orgs;
+};
+
+/**
+ * Extracts location data from a USASpending award's primary place of performance.
+ *
+ * @param {Object} usaAward - Raw award from USASpending API
+ * @returns {Object|null} Location data or null
+ */
+export const extractPerformanceLocationFromUSASpending = (usaAward) => {
+  const location = usaAward?.["Primary Place of Performance"];
+  if (!location) return null;
+
+  return {
+    city: location.city_name || null,
+    state: location.state_code || null,
+    stateFullName: location.state_name || null,
+    zip: location.zip5 || null,
+    countryCode: location.location_country_code || null,
+    county: location.county_name || null,
+  };
+};
+
+/**
+ * Extracts recipient location from USASpending award.
+ *
+ * @param {Object} usaAward - Raw award from USASpending API
+ * @returns {Object|null} Location data or null
+ */
+export const extractRecipientLocationFromUSASpending = (usaAward) => {
+  const location = usaAward?.["Recipient Location"];
+  if (!location) return null;
+
+  return {
+    city: location.city_name || null,
+    state: location.state_code || null,
+    stateFullName: location.state_name || null,
+    zip: location.zip5 || null,
+    countryCode: location.location_country_code || null,
+    county: location.county_name || null,
+    address1: location.address_line1 || null,
+    address2: location.address_line2 || null,
+    address3: location.address_line3 || null,
+  };
+};

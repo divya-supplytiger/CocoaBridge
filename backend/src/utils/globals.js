@@ -7,6 +7,7 @@ export const industryDayTitleKeywords = [
   "outreach",
   "conference",
   "vendor day",
+  "open house",
   "industry engagement",
   "industry briefing",
   "industry forum",
@@ -22,25 +23,18 @@ export const solicitationTitleKeywords = [
   "subsistence",
   "rations",
   "morale",
-  "refreshments",
   "candy",
   "chocolate",
   "concessions",
   "pantry",
   "nutrition",
   "meals",
-  "beverages",
   "consumables",
-  "event",
-  "training",
   "ceremony",
   "exercise",
-  "drill",
-  "graduation",
-  "open house",
+  "sugar",
   "MWR",
   "family",
-  "day",
   "appreciation",
   "holiday",
   "supplies",
@@ -48,11 +42,10 @@ export const solicitationTitleKeywords = [
   "miscellaneous",
   "consumables",
   "support items",
-  "materials",
   "general items",
 ];
 
-export const classificationPrefixes = ["89"];
-export const naicsPrefixes = ["445", "424", "311340"];
+// NAICS and Classification codes relevant to Supply Tiger's focus
+export const classificationPrefixes = ["89"]; // 89: Subsistence
+export const naicsPrefixes = ["445", "424", "311340"]; // 445: Grocery Stores, 424: Grocery and Related Product Merchant Wholesalers, 311340: Nonchocolate Confectionery Manufacturing
 export const validCountries = ["USA", "US"];
-

@@ -223,6 +223,8 @@ model Award {
 
   externalId String? @unique
 
+  description String?
+
   naicsCodes String[] @default([])
   pscCode    String?
 
@@ -230,6 +232,7 @@ model Award {
   startDate       DateTime?
   endDate         DateTime?
 
+  // TODO: Ensure that award is inherantly linked
   opportunityId String?
   opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
 
