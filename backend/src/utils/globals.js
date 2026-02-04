@@ -1,6 +1,10 @@
 // Global constants and variables that pertain to SUPPLY TIGER
 
-import { link } from "fs";
+export const adminEmails = [
+  "divya@supplytiger.com",
+  "ryan@supplytiger.com",
+  "john@supplytiger.com",
+];
 
 // Used for SAM.gov filtering
 export const industryDayTitleKeywords = [
@@ -49,7 +53,7 @@ export const solicitationTitleKeywords = [
 
 // NAICS and Classification codes relevant to Supply Tiger's focus
 export const classificationPrefixes = ["89"]; // 89: Subsistence
-export const naicsPrefixes = ["445", "424", "311340"]; // 445: Grocery Stores, 424: Grocery and Related Product Merchant Wholesalers, 311340: Nonchocolate Confectionery Manufacturing
+export const naicsPrefixes = ["445", "424", "311340", "311351", "311352"]; // 445: Grocery Stores, 424: Grocery and Related Product Merchant Wholesalers, 311340: Nonchocolate Confectionery Manufacturing
 export const validCountries = ["USA", "US"];
 
 // USASpending filter presets for common searches
