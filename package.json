@@ -1,0 +1,25 @@
+{
+  "name": "supplytigergoa",
+  "version": "1.0.0",
+  "description": "This project supports **SupplyTiger's execution-focused expansion into U.S. Federal Government sales**, with a primary emphasis on **micro-purchases, open-market buys, and subcontracting**.",
+  "main": "index.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend",
+    "start": "npm run start --prefix backend"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/divya-supplytiger/SupplyTigerGOA.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/divya-supplytiger/SupplyTigerGOA/issues"
+  },
+  "homepage": "https://github.com/divya-supplytiger/SupplyTigerGOA#readme"
+}

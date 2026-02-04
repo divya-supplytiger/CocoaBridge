@@ -13,6 +13,10 @@ export const ENV = {
   INNGEST_SIGNING_KEY: process.env.INNGEST_SIGNING_KEY,
   SAMGOV_API_KEY: process.env.SAMGOV_API_KEY,
   SAMGOV_NOTICE_DESC_URL: process.env.SAMGOV_NOTICE_DESC_URL,
+  NEON_DB_API: process.env.NEON_DB_API,
+  ADMIN_EMAILS: process.env.ADMIN_EMAILS
+    ? process.env.ADMIN_EMAILS.split(",").map((e) => e.trim())
+    : [],
 };
 
 const required = [
@@ -23,10 +27,14 @@ const required = [
   "INNGEST_SIGNING_KEY",
   "SAMGOV_API_KEY",
   "SAMGOV_NOTICE_DESC_URL",
+  "NEON_DB_API",
+  "CLIENT_URL",
 ];
 
 const missing = required.filter((key) => !ENV[key]);
 
 if (missing.length) {
-  throw new Error(`Missing required environment variables: ${missing.join(", ")}`);
+  throw new Error(
+    `Missing required environment variables: ${missing.join(", ")}`,
+  );
 }
