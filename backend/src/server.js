@@ -7,6 +7,8 @@ import { clerkMiddleware } from "@clerk/express";
 import samRoutes from "./routes/sam.routes.js";
 import USASpendingRoutes from "./routes/usaspending.routes.js";
 import prisma from "./config/db.js";
+import { inngest, functions } from "./config/inngest.js";
+import { serve } from "inngest/express";
 
 const app = express();
 const __dirname = path.resolve();
@@ -37,6 +39,7 @@ app.use(
 );
 
 // Mount routes
+app.use("/api/inngest", serve({ client: inngest, functions }));
 app.use("/api/samgov", samRoutes);
 app.use("/api/usaspending", USASpendingRoutes);
 

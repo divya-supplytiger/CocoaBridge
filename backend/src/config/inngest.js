@@ -6,3 +6,5 @@ export const inngest = new Inngest({
   name: "SupplyTigerGOA Inngest Client",
   id: ENV.INNGEST_ID,
 });
+
+export const functions = [];
