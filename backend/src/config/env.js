@@ -14,6 +14,7 @@ export const ENV = {
   SAMGOV_API_KEY: process.env.SAMGOV_API_KEY,
   SAMGOV_NOTICE_DESC_URL: process.env.SAMGOV_NOTICE_DESC_URL,
   NEON_DB_API: process.env.NEON_DB_API,
+  INNGEST_ID: process.env.INNGEST_ID,
   ADMIN_EMAILS: process.env.ADMIN_EMAILS
     ? process.env.ADMIN_EMAILS.split(",").map((e) => e.trim())
     : [],
@@ -29,6 +30,7 @@ const required = [
   "SAMGOV_NOTICE_DESC_URL",
   "NEON_DB_API",
   "CLIENT_URL",
+  "INNGEST_ID",
 ];
 
 const missing = required.filter((key) => !ENV[key]);
