@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
     "seed:users": "node src/seeds/users.seed.js"
   },
   "type": "module",
