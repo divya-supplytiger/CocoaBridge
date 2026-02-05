@@ -43,6 +43,10 @@ app.use("/api/inngest", serve({ client: inngest, functions }));
 app.use("/api/samgov", samRoutes);
 app.use("/api/usaspending", USASpendingRoutes);
 
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ message: "API success" });
+});
+
 // Add deployment-specific configurations
 if (ENV.NODE_ENV !== "development") {
   // Serve static files from the React frontend app
