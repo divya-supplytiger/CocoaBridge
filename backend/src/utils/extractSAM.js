@@ -13,7 +13,6 @@ import {
   SourceSystem,
   OrgLevel,
 } from "@prisma/client";
-import { JSDOM } from "jsdom";
 
 /*
   Extract organization hierarchy from SAM opportunity.
@@ -138,9 +137,18 @@ export const extractType = (opportunity) => {
 
 export const stripHTML = (htmlString) => {
   if (!htmlString) return null;
-  const dom = new JSDOM(htmlString);
-  const textContent = dom.window.document.body.textContent || null;
-  return textContent ? String(textContent).trim() : null;
+  // Remove HTML tags and decode common entities
+  const text = String(htmlString)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text || null;
 };
 
 export const extractTag = (opportunity) => {
