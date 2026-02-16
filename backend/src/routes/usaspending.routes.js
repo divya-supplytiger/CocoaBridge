@@ -167,7 +167,4 @@ router.get("/award/:award_id", getAwardByIdFromUsaspending);
  */
 router.post("/sync-awards", syncAwardsFromUsaspending);
 
-// TODO: Optional Endpoint (add if needed):
-// Endpoint F: /api/v2/agency/<TOPTIER_AGENCY_CODE>/sub_agency/
-
 export default router;
