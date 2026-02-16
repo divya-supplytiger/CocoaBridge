@@ -16,7 +16,7 @@ export const ENV = {
   NEON_DB_API: process.env.NEON_DB_API,
   INNGEST_ID: process.env.INNGEST_ID,
   ADMIN_EMAILS: process.env.ADMIN_EMAILS
-    ? process.env.ADMIN_EMAILS.split(",").map((e) => e.trim())
+    ? process.env.ADMIN_EMAILS.split(",").map((e) => e.trim().toLowerCase())
     : [],
 };
 
