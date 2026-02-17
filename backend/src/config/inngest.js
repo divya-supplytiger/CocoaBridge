@@ -1,7 +1,13 @@
 import { Inngest } from "inngest";
 import {ENV } from "../config/env.js";
-import { createUser, updateUser, deleteUser, changeExpiredOpportunitiesToInactive } from "../controllers/db.controller.js";
-import { runCurrentOpportunitiesSyncFromSam, backfillNullOpportunityDescriptionsFromSam } from "../controllers/sam.controller.js";
+import {
+  createUser,
+  updateUser,
+  deleteUser,
+  changeExpiredOpportunitiesToInactive,
+  runBackfillNullOpportunityDescriptionsFromSam,
+} from "../controllers/db.controller.js";
+import { runCurrentOpportunitiesSyncFromSam } from "../controllers/sam.controller.js";
 // Initialize Inngest with your account's unique identifier to link events and functions
 export const inngest = new Inngest({
   name: "SupplyTigerGOA Inngest Client",
@@ -80,8 +86,7 @@ export const getOpportunityDescriptionsFromSamDaily = inngest.createFunction(
   },
   { cron: "30 5 * * *" }, // Every day at 12:30am EST (5:30am UTC) --- after the sync job runs to give it time to update the db with new opportunities
   async () => {
-    // Call the controller function to backfill null descriptions
-    const result = await backfillNullOpportunityDescriptionsFromSam();
+    const result = await runBackfillNullOpportunityDescriptionsFromSam();
     return {
       success: true,
       ...result,

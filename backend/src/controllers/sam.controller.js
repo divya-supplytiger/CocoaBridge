@@ -1083,89 +1083,13 @@ const fetchOpportunityDescriptionFromSam = async (noticeId) => {
 
 export const backfillNullOpportunityDescriptionsFromSam = async (req, res) => {
   try {
-    const cacheInDB = req.query.cacheInDB !== "false";
-    // Fetch opportunities with null or empty descriptions, with pagination
-    const limit = Math.max(
-      1,
-      Math.min(Number.parseInt(req.query.limit, 10) || 100, 1000),
-    );
-
-    const opportunities = await prisma.opportunity.findMany({
-      where: {
-        noticeId: { not: null },
-        OR: [{ description: null }, { description: "" }],
-      },
-      select: {
-        id: true,
-        noticeId: true,
-        title: true,
-      },
-      take: limit,
-      orderBy: { postedDate: "desc" },
+    const query = req?.query ?? {};
+    const payload = await runBackfillNullOpportunityDescriptionsFromSam({
+      cacheInDB: query.cacheInDB !== "false",
+      limit: query.limit,
     });
 
-    let fetched = 0;
-    let updated = 0;
-    let noDescription = 0;
-    let failed = 0;
-    const failures = [];
-
-    for (const opp of opportunities) {
-      if (!opp.noticeId) {
-        failed += 1;
-        failures.push({
-          id: opp.id,
-          noticeId: null,
-          title: opp.title,
-          message: "Missing noticeId",
-        });
-        continue;
-      }
-
-      try {
-        const description = await fetchOpportunityDescriptionFromSam(opp.noticeId);
-        fetched += 1;
-
-        if (!description) {
-          noDescription += 1;
-          continue;
-        }
-
-        const filteredDescription = stripHTML(description);
-
-        if (cacheInDB && filteredDescription) {
-          await prisma.opportunity.update({
-            where: { id: opp.id },
-            data: { description: filteredDescription },
-          });
-          updated += 1;
-        }
-      } catch (error) {
-        failed += 1;
-        failures.push({
-          id: opp.id,
-          noticeId: opp.noticeId,
-          title: opp.title,
-          message: error?.message ?? String(error),
-        });
-      }
-    }
-
-    return res.status(200).json({
-      ok: true,
-      cacheInDB,
-      meta: {
-        selected: opportunities.length,
-        limit,
-      },
-      results: {
-        fetched,
-        updated,
-        noDescription,
-        failed,
-      },
-      failures,
-    });
+    return res.status(200).json(payload);
   } catch (error) {
     console.error(
       "Error in backfillNullOpportunityDescriptionsFromSam controller:",
