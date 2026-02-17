@@ -204,4 +204,4 @@ export const usaSpendingPresetNames = [
 ];
 
 export const samGovIndustryDayPTypes = ["s", "r", "p", "k"];
-export const samGovSolicitationPTypes = ["r", "k", "o"];
+export const samGovSolicitationPTypes = ["r", "k", "o", "s", "p"];

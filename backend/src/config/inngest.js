@@ -58,15 +58,14 @@ const deleteUserInDB = inngest.createFunction(
 );
 
 // CRON JOBS
-// Every day at midnight, run a cron job to deactivate expired opportunities
+// Every day at 12:15 AM EST, run a cron job to deactivate expired opportunities
 export const deactivateExpiredOpportunities = inngest.createFunction(
   {
     id: "deactivate-expired-opportunities",
-    name: "Deactivate Expired Opportunities",
-    description:
-      "Cron job to deactivate expired opportunities every day at midnight",
+    name: "Deactivate Expired Opportunities Daily",
+    description: "Cron job to deactivate expired opportunities every day at 12:15 AM EST",
   },
-  { cron: "0 5 * * *" }, // Every day at midnight EST (5 am UTC)
+  { cron: "15 5 * * *" }, // Every day at 12:15 AM EST (5:15 am UTC)
   async () => {
     const result = await changeExpiredOpportunitiesToInactive();
     return {
@@ -81,7 +80,7 @@ export const getOpportunityDescriptionsFromSamDaily = inngest.createFunction(
   {
     id: "get-opportunity-descriptions-from-sam-daily",
     name: "Get Opportunity Descriptions from SAM Daily",
-    description: "Cron job to update null opportunity descriptions from SAM.gov every day",
+    description: "Cron job to update null opportunity descriptions from SAM.gov every day at 12:30 AM EST",
   
   },
   { cron: "30 5 * * *" }, // Every day at 12:30am EST (5:30am UTC) --- after the sync job runs to give it time to update the db with new opportunities
@@ -99,9 +98,9 @@ export const syncCurrentSamOpportunitiesDaily = inngest.createFunction(
     id: "sync-current-sam-opportunities-daily",
     name: "Sync Current SAM Opportunities Daily",
     description:
-      "Daily cron to sync SAM current opportunities using pType/fromDate/toDate window",
+      "Daily cron to sync SAM current opportunities to the database every day at 12:00 AM EST",
   },
-  { cron: "15 5 * * *" }, // 12:15am EST / 5:15am UTC
+  { cron: "0 5 * * *" }, // 12:00am EST / 5:00am UTC
   async () => {
     const result = await runCurrentOpportunitiesSyncFromSam();
     return {

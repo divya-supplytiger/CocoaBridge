@@ -489,7 +489,7 @@ export async function runCurrentOpportunitiesSyncFromSam({
   cacheInDB = "true",
 } = {}) {
   const now = new Date();
-  const lookbackDays = 364;
+  const lookbackDays = 7;
   const lookbackDate = new Date(now);
   lookbackDate.setUTCDate(lookbackDate.getUTCDate() - lookbackDays);
 
