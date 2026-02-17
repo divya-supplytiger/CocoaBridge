@@ -342,8 +342,6 @@ async function upsertHistoricalOpportunityFromSam(prisma, opportunity) {
     tag: normalized.tag,
     active: normalized.active,
 
-    description: null,
-
     postedDate: normalized.postedDate,
     responseDeadline: normalized.responseDeadline,
 
@@ -361,7 +359,7 @@ async function upsertHistoricalOpportunityFromSam(prisma, opportunity) {
   const opp = await prisma.opportunity.upsert({
     where: { noticeId: normalized.noticeId },
     update: data,
-    create: data,
+    create: { ...data, description: null },
   });
 
   if (opportunity?.award?.number) {
@@ -403,8 +401,6 @@ async function upsertOpportunityFromSam(prisma, opportunity) {
     tag: normalized.tag,
     active: normalized.active,
 
-    description: null,
-
     // Dates (still derived from raw SAM payload)
     postedDate: normalized.postedDate,
     responseDeadline: normalized.responseDeadline,
@@ -425,7 +421,7 @@ async function upsertOpportunityFromSam(prisma, opportunity) {
   const opp = await prisma.opportunity.upsert({
     where: { noticeId: normalized.noticeId },
     update: data,
-    create: data,
+    create: { ...data, description: null },
   });
 
   // Upsert award and recipient associated with this opportunity
