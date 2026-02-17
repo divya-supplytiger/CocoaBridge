@@ -116,4 +116,5 @@ export const functions = [
   deleteUserInDB,
   deactivateExpiredOpportunities,
   syncCurrentSamOpportunitiesDaily,
+  getOpportunityDescriptionsFromSamDaily,
 ];
