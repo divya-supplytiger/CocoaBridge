@@ -496,7 +496,11 @@ export async function runCurrentOpportunitiesSyncFromSam({
   const lookbackDate = new Date(now);
   lookbackDate.setUTCDate(lookbackDate.getUTCDate() - lookbackDays);
 
-  const resolvedPType = pType ?? samGovSolicitationPTypes.join(",");
+  // SAM.gov only accepts one ptype per request, so resolve to an array
+  const resolvedPTypes = pType
+    ? String(pType).split(",").map((p) => p.trim()).filter(Boolean)
+    : [...samGovSolicitationPTypes];
+
   let resolvedFromDate;
   let resolvedToDate;
 
@@ -518,57 +522,71 @@ export async function runCurrentOpportunitiesSyncFromSam({
     resolvedToDate = toYYYYMMDD(now);
   }
 
-  const samQuery = {
-    ptype: resolvedPType,
-    postedFrom: resolvedFromDate,
-    postedTo: resolvedToDate,
-  };
+  // Loop over each ptype individually (SAM.gov only allows one at a time)
+  let allOpportunities = [];
+  const paginationByPType = {};
 
-  let opportunities = [];
-  let paginationInfo = null;
+  for (const singlePType of resolvedPTypes) {
+    const samQuery = {
+      ptype: singlePType,
+      postedFrom: resolvedFromDate,
+      postedTo: resolvedToDate,
+    };
 
-  if (String(fullSync) === "true") {
-    const result = await fetchAllOpportunitiesFromSam(
-      samQuery,
-      Number.parseInt(maxPages, 10) || 10,
-    );
-    opportunities = Array.isArray(result?.opportunities)
-      ? result.opportunities
-      : [];
-    paginationInfo = result?.pagination ?? null;
-  } else if (page !== undefined) {
-    const paged = await fetchOpportunitiesFromSamWithPagination(
-      samQuery,
-      Number.parseInt(page, 10) || 1,
-      Number.parseInt(limit, 10) || 1000,
-    );
-    opportunities = Array.isArray(paged?.opportunities)
-      ? paged.opportunities
-      : [];
-    paginationInfo = paged?.pagination ?? null;
-  } else {
-    const response = await axios.get(ENV.SAMGOV_BASE_URL, {
-      params: {
-        api_key: ENV.SAMGOV_API_KEY,
-        ...samQuery,
-      },
-      timeout: 75000,
-    });
+    let opportunities = [];
+    let paginationInfo = null;
 
-    const data = response.data;
-    opportunities =
-      data.response?.opportunitiesData ||
-      data?.opportunitiesData ||
-      data?.opportunities ||
-      data?.data ||
-      [];
+    if (String(fullSync) === "true") {
+      const result = await fetchAllOpportunitiesFromSam(
+        samQuery,
+        Number.parseInt(maxPages, 10) || 10,
+      );
+      opportunities = Array.isArray(result?.opportunities)
+        ? result.opportunities
+        : [];
+      paginationInfo = result?.pagination ?? null;
+    } else if (page !== undefined) {
+      const paged = await fetchOpportunitiesFromSamWithPagination(
+        samQuery,
+        Number.parseInt(page, 10) || 1,
+        Number.parseInt(limit, 10) || 1000,
+      );
+      opportunities = Array.isArray(paged?.opportunities)
+        ? paged.opportunities
+        : [];
+      paginationInfo = paged?.pagination ?? null;
+    } else {
+      const response = await axios.get(ENV.SAMGOV_BASE_URL, {
+        params: {
+          api_key: ENV.SAMGOV_API_KEY,
+          ...samQuery,
+        },
+        timeout: 75000,
+      });
+
+      const data = response.data;
+      opportunities =
+        data.response?.opportunitiesData ||
+        data?.opportunitiesData ||
+        data?.opportunities ||
+        data?.data ||
+        [];
+    }
+
+    if (!Array.isArray(opportunities)) {
+      opportunities = [];
+    }
+
+    allOpportunities.push(...opportunities);
+    paginationByPType[singlePType] = paginationInfo;
+
+    // Small delay between ptype requests to avoid rate limits
+    if (resolvedPTypes.indexOf(singlePType) < resolvedPTypes.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
   }
 
-  if (!Array.isArray(opportunities)) {
-    opportunities = [];
-  }
-
-  const filteredOpportunities = opportunities.filter(
+  const filteredOpportunities = allOpportunities.filter(
     matchesOpportunitySolicitation,
   );
 
@@ -601,11 +619,15 @@ export async function runCurrentOpportunitiesSyncFromSam({
   }
 
   return {
-    query: samQuery,
+    query: {
+      ptypes: resolvedPTypes,
+      postedFrom: resolvedFromDate,
+      postedTo: resolvedToDate,
+    },
     meta: {
-      pulled: opportunities.length,
+      pulled: allOpportunities.length,
       returned: filteredOpportunities.length,
-      ...(paginationInfo && { pagination: paginationInfo }),
+      paginationByPType,
     },
     db: {
       attempted,
@@ -909,66 +931,76 @@ export const getIndustryDayOpportunitiesFromSam = async (req, res) => {
       ...samQuery
     } = query;
 
-    const resolvedSamQuery = {
-      ...samQuery,
-      pType:
-        typeof pType === "string" && pType.trim()
-          ? pType
-          : samGovIndustryDayPTypes.join(","),
-    };
+    // SAM.gov only accepts one ptype per request, so resolve to an array
+    const resolvedPTypes =
+      typeof pType === "string" && pType.trim()
+        ? pType.split(",").map((p) => p.trim()).filter(Boolean)
+        : [...samGovIndustryDayPTypes];
 
-    let opportunities = [];
-    let paginationInfo = null;
+    let allOpportunities = [];
+    let paginationByPType = {};
 
-    // Fetch opportunities with pagination support
-    if (fullSync === "true") {
-      // Fetch all pages (for complete sync)
-      const result = await fetchAllOpportunitiesFromSam(
-        resolvedSamQuery,
-        parseInt(maxPages),
-      );
-      opportunities = result.opportunities || [];
-      paginationInfo = result.pagination;
-    } else if (page !== undefined) {
-      // Single page fetch
-      const result = await fetchOpportunitiesFromSamWithPagination(
-        resolvedSamQuery,
-        parseInt(page) || 1, // SAM.gov pages start at 1, not 0
-        parseInt(limit),
-      );
-      opportunities = result.opportunities;
-      paginationInfo = result.pagination;
-    } else {
-      // Legacy single request (no pagination)
-      const response = await axios.get(ENV.SAMGOV_BASE_URL, {
-        params: {
-          api_key: ENV.SAMGOV_API_KEY,
-          ...resolvedSamQuery,
-        },
-        timeout: 75000,
-      });
+    for (const singlePType of resolvedPTypes) {
+      const resolvedSamQuery = {
+        ...samQuery,
+        ptype: singlePType,
+      };
 
-      const data = response.data;
+      let opportunities = [];
+      let paginationInfo = null;
 
-      opportunities =
-        data.response?.opportunitiesData ||
-        data?.opportunitiesData ||
-        data?.opportunities ||
-        data?.data ||
-        [];
+      // Fetch opportunities with pagination support
+      if (fullSync === "true") {
+        // Fetch all pages (for complete sync)
+        const result = await fetchAllOpportunitiesFromSam(
+          resolvedSamQuery,
+          parseInt(maxPages),
+        );
+        opportunities = result.opportunities || [];
+        paginationInfo = result.pagination;
+      } else if (page !== undefined) {
+        // Single page fetch
+        const result = await fetchOpportunitiesFromSamWithPagination(
+          resolvedSamQuery,
+          parseInt(page) || 1, // SAM.gov pages start at 1, not 0
+          parseInt(limit),
+        );
+        opportunities = result.opportunities;
+        paginationInfo = result.pagination;
+      } else {
+        // Legacy single request (no pagination)
+        const response = await axios.get(ENV.SAMGOV_BASE_URL, {
+          params: {
+            api_key: ENV.SAMGOV_API_KEY,
+            ...resolvedSamQuery,
+          },
+          timeout: 75000,
+        });
+
+        const data = response.data;
+
+        opportunities =
+          data.response?.opportunitiesData ||
+          data?.opportunitiesData ||
+          data?.opportunities ||
+          data?.data ||
+          [];
+      }
+
+      if (!Array.isArray(opportunities)) {
+        opportunities = [];
+      }
+
+      allOpportunities.push(...opportunities);
+      paginationByPType[singlePType] = paginationInfo;
+
+      // Small delay between ptype requests to avoid rate limits
+      if (resolvedPTypes.indexOf(singlePType) < resolvedPTypes.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
     }
 
-    // Ensure opportunities is always an array
-    if (!Array.isArray(opportunities)) {
-      console.warn(
-        "Opportunities is not an array:",
-        typeof opportunities,
-        opportunities,
-      );
-      opportunities = [];
-    }
-
-    const filteredOpportunities = opportunities.filter(
+    const filteredOpportunities = allOpportunities.filter(
       matchesOpportunityIndustryDay,
     );
 
@@ -1009,9 +1041,9 @@ export const getIndustryDayOpportunitiesFromSam = async (req, res) => {
 
     const responseData = {
       meta: {
-        pulled: opportunities.length,
+        pulled: allOpportunities.length,
         returned: filteredOpportunities.length,
-        ...(paginationInfo && { pagination: paginationInfo }),
+        paginationByPType,
       },
       db: { attempted, upserted, skipped, errors },
       data: {
