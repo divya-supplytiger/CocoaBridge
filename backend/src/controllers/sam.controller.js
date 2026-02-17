@@ -1069,7 +1069,7 @@ export const getOpportunityDescriptionFromSam = async (req, res) => {
   }
 };
 
-const fetchOpportunityDescriptionFromSam = async (noticeId) => {
+export const fetchOpportunityDescriptionFromSam = async (noticeId) => {
   const response = await axios.get(ENV.SAMGOV_NOTICE_DESC_URL, {
     params: {
       api_key: ENV.SAMGOV_API_KEY,
