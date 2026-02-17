@@ -519,9 +519,9 @@ export async function runCurrentOpportunitiesSyncFromSam({
   }
 
   const samQuery = {
-    pType: resolvedPType,
-    fromDate: resolvedFromDate,
-    toDate: resolvedToDate,
+    ptype: resolvedPType,
+    postedFrom: resolvedFromDate,
+    postedTo: resolvedToDate,
   };
 
   let opportunities = [];
