@@ -8,6 +8,7 @@ import {
   runBackfillNullOpportunityDescriptionsFromSam,
 } from "../controllers/db.controller.js";
 import { runCurrentOpportunitiesSyncFromSam } from "../controllers/sam.controller.js";
+import { runAwardsSyncFromUsaspending } from "../controllers/usaspending.controller.js";
 // Initialize Inngest with your account's unique identifier to link events and functions
 export const inngest = new Inngest({
   name: "SupplyTigerGOA Inngest Client",
@@ -22,7 +23,6 @@ const syncUser = inngest.createFunction(
     description: "Sync new users to the database from Clerk",
   },
   { event: "clerk/user.created" },
-  // todo: implement function logic
     async ({ event }) => {
         console.log("{DEBUG} New user created event received:", event);
         await createUser(event);
@@ -59,9 +59,9 @@ const deleteUserInDB = inngest.createFunction(
 
 // CRON JOBS
 // Every day at 12:15 AM EST, run a cron job to deactivate expired opportunities
-export const deactivateExpiredOpportunities = inngest.createFunction(
+export const deactivateExpiredOpportunitiesDaily = inngest.createFunction(
   {
-    id: "deactivate-expired-opportunities",
+    id: "deactivate-expired-opportunities-daily",
     name: "Deactivate Expired Opportunities Daily",
     description: "Cron job to deactivate expired opportunities every day at 12:15 AM EST",
   },
@@ -75,7 +75,6 @@ export const deactivateExpiredOpportunities = inngest.createFunction(
   },
 );
 
-// TODO: GET OPPORTUNITY DESCRIPTIONS FROM SAM.GOV (DAILY CRON)
 export const getOpportunityDescriptionsFromSamDaily = inngest.createFunction(
   {
     id: "get-opportunity-descriptions-from-sam-daily",
@@ -92,7 +91,6 @@ export const getOpportunityDescriptionsFromSamDaily = inngest.createFunction(
     };
   },
 );
-// TODO: SYNC OPPORTUNITIES FROM SAM.GOV TO DB (Current Opportunities)
 export const syncCurrentSamOpportunitiesDaily = inngest.createFunction(
   {
     id: "sync-current-sam-opportunities-daily",
@@ -112,13 +110,30 @@ export const syncCurrentSamOpportunitiesDaily = inngest.createFunction(
 
 // TODO: SYNC OPPORTUNITIES FROM SAM.GOV TO DB (Industry Day Opportunities)
 
-// TODO: SYNC AWARDS FROM USASPENDING TO DB
+// Sync awards from USASpending every 3 days
+export const syncAwardsFromUsaspendingBiWeekly = inngest.createFunction(
+  {
+    id: "sync-awards-from-usaspending",
+    name: "Sync USASpending Awards",
+    description:
+      "Cron job to sync awards from USASpending.gov to the database every 3 days at 1:00 AM EST",
+  },
+  { cron: "0 6 */3 * *" }, // Every 3 days at 1:00am EST (6:00am UTC)
+  async () => {
+    const result = await runAwardsSyncFromUsaspending();
+    return {
+      synced: true,
+      ...result,
+    };
+  },
+);
 
 export const functions = [
   syncUser,
   updateUserInDB,
   deleteUserInDB,
-  deactivateExpiredOpportunities,
+  deactivateExpiredOpportunitiesDaily,
   syncCurrentSamOpportunitiesDaily,
   getOpportunityDescriptionsFromSamDaily,
+  syncAwardsFromUsaspendingBiWeekly,
 ];

@@ -365,6 +365,112 @@ export const getAwardByIdFromUsaspending = async (req, res) => {
 };
 
 /**
+ * Reusable sync function for Inngest / programmatic use.
+ * Loops through all award presets, sets end_date to today, and upserts.
+ *
+ * @param {Object} options
+ * @param {string} [options.preset] - Specific preset name, or null to run all presets
+ * @param {boolean} [options.syncAll=true] - Paginate through all results
+ * @returns {Promise<Object>} Summary of the sync
+ */
+export async function runAwardsSyncFromUsaspending({ preset, syncAll = true } = {}) {
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+  // Determine which presets to run
+  const presetNames = preset
+    ? [preset]
+    : Object.keys(usaSpendingFilters.searchByAward || {}).filter(
+        (k) => k !== "link",
+      );
+
+  const summaryByPreset = {};
+
+  for (const name of presetNames) {
+    const presetFilter = usaSpendingFilters.searchByAward?.[name];
+    if (!presetFilter) {
+      summaryByPreset[name] = { error: `Invalid preset: "${name}"` };
+      continue;
+    }
+
+    // Deep-clone filters so we don't mutate the global object
+    const filters = JSON.parse(JSON.stringify(presetFilter));
+
+    // Move end_date to today for each time_period entry
+    if (filters.filters?.time_period) {
+      for (const tp of filters.filters.time_period) {
+        tp.end_date = today;
+      }
+    }
+
+    const limit = filters.limit || 100;
+    let currentPage = filters.page || 1;
+    let attempted = 0;
+    let upserted = 0;
+    let skipped = 0;
+    const errors = [];
+    let totalRecords = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      try {
+        const response = await axios.post(
+          `${ENV.USASPENDING_BASE_URL}/api/v2/search/spending_by_award/`,
+          {
+            ...filters,
+            limit,
+            page: currentPage,
+            fields: filters.fields ?? DEFAULT_AWARD_FIELDS,
+            spending_level: filters.spending_level ?? "awards",
+          },
+          {
+            headers: { "Content-Type": "application/json" },
+            timeout: 30000,
+          },
+        );
+
+        const awards = response.data.results || [];
+        totalRecords = response.data.page_metadata?.total || 0;
+
+        if (awards.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        const results = await bulkUpsertAwardsFromUSASpending(awards);
+        attempted += results.total;
+        upserted += results.successful;
+        skipped += results.failed;
+        errors.push(...results.errors);
+
+        const processedSoFar = currentPage * limit;
+        hasMore = syncAll && processedSoFar < totalRecords;
+        currentPage++;
+
+        if (currentPage > 1000) {
+          console.warn(`[${name}] Reached page limit of 1000, stopping.`);
+          break;
+        }
+      } catch (error) {
+        console.error(`[${name}] Error on page ${currentPage}:`, error.message);
+        errors.push({ page: currentPage, error: error.message });
+        hasMore = false;
+      }
+    }
+
+    summaryByPreset[name] = {
+      total: totalRecords,
+      pagesProcessed: currentPage - (filters.page || 1),
+      db: { attempted, upserted, skipped, errors: errors.slice(0, 5) },
+    };
+  }
+
+  return {
+    syncedAt: today,
+    presets: summaryByPreset,
+  };
+}
+
+/**
  * Syncs awards from USASpending API to the database.
  * Fetches awards based on the request body filters and upserts them.
  *
