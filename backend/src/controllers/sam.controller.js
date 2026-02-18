@@ -326,17 +326,19 @@ async function upsertAwardAndRecipientFromSam(
   const isMicrosaction = award.obligatedAmount && award.obligatedAmount < MICROPURCHASE_THRESHOLD;
 
 
+  if (!existingAward) {
   await emitInternalEventSafe("internal/award.upserted", {
     source: awardRecord.source,
     awardId: awardRecord.id,
     opportunityId,
-    op: existingAward ? "UPDATED" : "CREATED",
+    op: "CREATED",
     title: null,
     summary: null,
     buyingOrganizationId: awardRecord.buyingOrganizationId ?? null,
     // Default acquisition path for awards until classification rules are added.
     acquisitionPath: isMicrosaction ? AcquisitionPath.MICROPURCHASE : AcquisitionPath.OPEN_MARKET,
   });
+  }
 
   return awardRecord;
 }
@@ -452,10 +454,11 @@ async function upsertOpportunityFromSam(prisma, opportunity) {
     create: { ...data, description: null },
   });
 
+  if (!existingOpportunity) {
   await emitInternalEventSafe("internal/opportunity.upserted", {
     source: opp.source,
     opportunityId: opp.id,
-    op: existingOpportunity ? "UPDATED" : "CREATED",
+    op: "CREATED",
     title: opp.title ?? null,
     summary: opp.description ?? null,
     type: opp.type ?? "OTHER",
@@ -464,6 +467,7 @@ async function upsertOpportunityFromSam(prisma, opportunity) {
     // TODOL Default acquisition path until opportunity classification is implemented.
     acquisitionPath: AcquisitionPath.OPEN_MARKET,
   });
+  }
 
   // Upsert award and recipient associated with this opportunity
   if (opportunity?.award?.number) {

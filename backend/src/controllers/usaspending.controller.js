@@ -155,16 +155,18 @@ export const upsertAwardFromUSASpending = async (usaAward) => {
 
   const isMicrosaction = award.obligatedAmount && award.obligatedAmount < MICROPURCHASE_THRESHOLD;
 
+  if (!existingAward) {
   await emitInternalEventSafe("internal/award.upserted", {
     source: award.source,
     awardId: award.id,
-    op: existingAward ? "UPDATED" : "CREATED",
+    op: "CREATED",
     title: null,
     summary: award.description ?? null,
     buyingOrganizationId: award.buyingOrganizationId ?? null,
     // Default acquisition path for awards until classification rules are added.
     acquisitionPath: isMicrosaction ? AcquisitionPath.MICROPURCHASE : AcquisitionPath.OPEN_MARKET,
   });
+  }
 
   return award;
 };
