@@ -11,8 +11,9 @@ import {
   deleteUser,
   changeExpiredOpportunitiesToInactive,
   runBackfillNullOpportunityDescriptionsFromSam,
+  markPastIndustryDays,
 } from "../controllers/db.controller.js";
-import { runCurrentOpportunitiesSyncFromSam } from "../controllers/sam.controller.js";
+import { runCurrentOpportunitiesSyncFromSam, runIndustryDaySyncFromSam } from "../controllers/sam.controller.js";
 import { runAwardsSyncFromUsaspending } from "../controllers/usaspending.controller.js";
 
 // Public export consumed by server route registration.
@@ -227,7 +228,41 @@ export const syncCurrentSamOpportunitiesDaily = inngest.createFunction(
   },
 );
 
-// TODO: SYNC OPPORTUNITIES FROM SAM.GOV TO DB (Industry Day Opportunities)
+// Daily sync of industry day opportunities from SAM.gov to DB
+export const syncIndustryDaysFromSamDaily = inngest.createFunction(
+  {
+    id: "sync-industry-days-from-sam-daily",
+    name: "Sync Industry Days from SAM Daily",
+    description:
+      "Daily cron to sync SAM industry day opportunities to the database every day at 12:45 AM EST",
+  },
+  { cron: "45 5 * * *" }, // 12:45am EST / 5:45am UTC
+  async () => {
+    const result = await runIndustryDaySyncFromSam();
+    return {
+      synced: true,
+      ...result,
+    };
+  },
+);
+
+// Mark industry days whose event date has passed as PAST_EVENT
+export const markPastIndustryDaysDaily = inngest.createFunction(
+  {
+    id: "mark-past-industry-days-daily",
+    name: "Mark Past Industry Days Daily",
+    description:
+      "Daily cron to mark industry days as PAST_EVENT once their event date has passed, runs at 12:20 AM EST",
+  },
+  { cron: "20 5 * * *" }, // 12:20am EST / 5:20am UTC
+  async () => {
+    const result = await markPastIndustryDays();
+    return {
+      success: true,
+      ...result,
+    };
+  },
+);
 
 // Sync awards from USASpending every 3 days
 export const syncAwardsFromUsaspendingBiWeekly = inngest.createFunction(
@@ -256,5 +291,7 @@ export const functions = [
   deactivateExpiredOpportunitiesDaily,
   syncCurrentSamOpportunitiesDaily,
   getOpportunityDescriptionsFromSamDaily,
+  syncIndustryDaysFromSamDaily,
+  markPastIndustryDaysDaily,
   syncAwardsFromUsaspendingBiWeekly,
 ];

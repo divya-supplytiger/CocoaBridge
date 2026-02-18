@@ -327,17 +327,20 @@ async function upsertAwardAndRecipientFromSam(
 
 
   if (!existingAward) {
-  await emitInternalEventSafe("internal/award.upserted", {
-    source: awardRecord.source,
-    awardId: awardRecord.id,
-    opportunityId,
-    op: "CREATED",
-    title: null,
-    summary: null,
-    buyingOrganizationId: awardRecord.buyingOrganizationId ?? null,
-    // Default acquisition path for awards until classification rules are added.
-    acquisitionPath: isMicrosaction ? AcquisitionPath.MICROPURCHASE : AcquisitionPath.OPEN_MARKET,
-  });
+    // todo: title function to generate title from award data
+    await emitInternalEventSafe("internal/award.upserted", {
+      source: awardRecord.source,
+      awardId: awardRecord.id,
+      opportunityId,
+      op: "CREATED",
+      title: null,
+      summary: null,
+      buyingOrganizationId: awardRecord.buyingOrganizationId ?? null,
+      // Default acquisition path for awards until classification rules are added.
+      acquisitionPath: isMicrosaction
+        ? AcquisitionPath.MICROPURCHASE
+        : AcquisitionPath.OPEN_MARKET,
+    });
   }
 
   return awardRecord;
@@ -957,6 +960,150 @@ export const getHistoricalOpportunitiesFromSam = async (req, res) => {
     });
   }
 };
+
+export async function runIndustryDaySyncFromSam({
+  pType,
+  fromDate,
+  toDate,
+  fullSync = "true",
+  maxPages = 10,
+  page,
+  limit = 1000,
+  cacheInDB = "true",
+} = {}) {
+  const now = new Date();
+  const lookbackDays = 30; // Industry days are posted further in advance than solicitations
+
+  const lookbackDate = new Date(now);
+  lookbackDate.setUTCDate(lookbackDate.getUTCDate() - lookbackDays);
+
+  const resolvedPTypes = pType
+    ? String(pType).split(",").map((p) => p.trim()).filter(Boolean)
+    : [...samGovIndustryDayPTypes];
+
+  let resolvedFromDate;
+  let resolvedToDate;
+
+  if (fromDate && toDate) {
+    resolvedFromDate = fromDate;
+    resolvedToDate = toDate;
+  } else if (fromDate && !toDate) {
+    const computedToDate = new Date(fromDate);
+    computedToDate.setUTCDate(computedToDate.getUTCDate() + lookbackDays);
+    resolvedFromDate = fromDate;
+    resolvedToDate = toMMDDYYYY(computedToDate);
+  } else if (!fromDate && toDate) {
+    const computedFromDate = new Date(toDate);
+    computedFromDate.setUTCDate(computedFromDate.getUTCDate() - lookbackDays);
+    resolvedFromDate = toMMDDYYYY(computedFromDate);
+    resolvedToDate = toDate;
+  } else {
+    resolvedFromDate = toMMDDYYYY(lookbackDate);
+    resolvedToDate = toMMDDYYYY(now);
+  }
+
+  let allOpportunities = [];
+  const paginationByPType = {};
+
+  for (const singlePType of resolvedPTypes) {
+    const samQuery = {
+      ptype: singlePType,
+      postedFrom: resolvedFromDate,
+      postedTo: resolvedToDate,
+    };
+
+    let opportunities = [];
+    let paginationInfo = null;
+
+    if (String(fullSync) === "true") {
+      const result = await fetchAllOpportunitiesFromSam(
+        samQuery,
+        Number.parseInt(maxPages, 10) || 10,
+      );
+      opportunities = Array.isArray(result?.opportunities) ? result.opportunities : [];
+      paginationInfo = result?.pagination ?? null;
+    } else if (page !== undefined) {
+      const paged = await fetchOpportunitiesFromSamWithPagination(
+        samQuery,
+        Number.parseInt(page, 10) || 1,
+        Number.parseInt(limit, 10) || 1000,
+      );
+      opportunities = Array.isArray(paged?.opportunities) ? paged.opportunities : [];
+      paginationInfo = paged?.pagination ?? null;
+    } else {
+      const response = await axios.get(ENV.SAMGOV_BASE_URL, {
+        params: { api_key: ENV.SAMGOV_API_KEY, ...samQuery },
+        timeout: 75000,
+      });
+      const data = response.data;
+      opportunities =
+        data.response?.opportunitiesData ||
+        data?.opportunitiesData ||
+        data?.opportunities ||
+        data?.data ||
+        [];
+    }
+
+    if (!Array.isArray(opportunities)) opportunities = [];
+
+    allOpportunities.push(...opportunities);
+    paginationByPType[singlePType] = paginationInfo;
+
+    if (resolvedPTypes.indexOf(singlePType) < resolvedPTypes.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  }
+
+  const filteredOpportunities = allOpportunities.filter(matchesOpportunityIndustryDay);
+
+  let attempted = 0;
+  let upserted = 0;
+  let skipped = 0;
+  const errors = [];
+
+  if (String(cacheInDB) === "true") {
+    for (const opp of filteredOpportunities) {
+      attempted += 1;
+
+      if (!opp?.noticeId && !opp?.id) {
+        skipped += 1;
+        continue;
+      }
+
+      try {
+        await prisma.$transaction(
+          async (tx) => {
+            const savedOpp = await upsertOpportunityFromSam(tx, opp);
+            await upsertIndustryDayFromSam(tx, opp, savedOpp.id);
+          },
+          { timeout: 30000 },
+        );
+        upserted += 1;
+      } catch (e) {
+        skipped += 1;
+        errors.push({
+          noticeId: opp?.noticeId ?? opp?.id ?? null,
+          title: opp?.title ?? null,
+          message: e?.message ?? String(e),
+        });
+      }
+    }
+  }
+
+  return {
+    query: {
+      ptypes: resolvedPTypes,
+      postedFrom: resolvedFromDate,
+      postedTo: resolvedToDate,
+    },
+    meta: {
+      pulled: allOpportunities.length,
+      returned: filteredOpportunities.length,
+      paginationByPType,
+    },
+    db: { attempted, upserted, skipped, errors },
+  };
+}
 
 export const getIndustryDayOpportunitiesFromSam = async (req, res) => {
   try {

@@ -156,6 +156,7 @@ export const upsertAwardFromUSASpending = async (usaAward) => {
   const isMicrosaction = award.obligatedAmount && award.obligatedAmount < MICROPURCHASE_THRESHOLD;
 
   if (!existingAward) {
+    // todo: title function to generate title from award data
   await emitInternalEventSafe("internal/award.upserted", {
     source: award.source,
     awardId: award.id,

@@ -1,6 +1,6 @@
 import prisma from "../config/db.js";
 import { ENV } from "../config/env.js";
-import { UserRole } from "@prisma/client";
+import { UserRole, IndustryDayStatus } from "@prisma/client";
 import {fetchOpportunityDescriptionFromSam} from "./sam.controller.js";
 import { stripHTML } from "../utils/extractSAM.js";
 
@@ -278,4 +278,23 @@ export const runBackfillNullOpportunityDescriptionsFromSam = async ({
     },
     failures,
   };
+};
+
+export const markPastIndustryDays = async () => {
+  const now = new Date();
+  try {
+    const result = await prisma.industryDay.updateMany({
+      where: {
+        eventDate: { lt: now },
+        status: { not: IndustryDayStatus.PAST_EVENT },
+      },
+      data: { status: IndustryDayStatus.PAST_EVENT },
+    });
+    return { message: `Marked ${result.count} industry days as PAST_EVENT` };
+  } catch (error) {
+    console.error("Error marking past industry days:", {
+      message: error?.message ?? "Unknown error",
+    });
+    throw error;
+  }
 };

@@ -277,19 +277,47 @@ export const extractLocation = (opportunity) => {
   return locationParts.length ? locationParts.join(", ") : null;
 };
 
-// todo: filter further
 export const matchesOpportunityIndustryDay = (item) => {
-  const industryDayTitleMatch = titleMatchesKeyword(
-    item?.title,
-    industryDayTitleKeywords,
-  );
   const countryCodes = extractCountry(item);
   const countryMatch =
     countryCodes.length === 0 ? true : countryCodes.some(isValidCountry);
 
-  // Industry-day endpoint should include explicit industry-day style notices,
-  // regardless of Supply-Tiger solicitation keywords/codes.
-  return industryDayTitleMatch && countryMatch;
+  if (!countryMatch) return false;
+
+  const industryDayTitleMatch = titleMatchesKeyword(
+    item?.title,
+    industryDayTitleKeywords,
+  );
+
+  // Must have an industry day keyword match in the title as a baseline for all criteria.
+  if (!industryDayTitleMatch) return false;
+
+  // Criteria 1: industry day title keyword match + solicitation keyword in title
+  const solicitationTitleMatch = titleMatchesKeyword(
+    item?.title,
+    solicitationTitleKeywords,
+  );
+  if (solicitationTitleMatch) return true;
+
+  // Criteria 2: industry day title keyword match + relevant NAICS code
+  const naicsCodes = extractNaicsCodes(item);
+  const naicsMatch = naicsCodes.some((code) =>
+    startsWithAny(code, naicsPrefixes),
+  );
+  if (naicsMatch) return true;
+
+  // Criteria 3: industry day title keyword match + relevant PSC/classification code
+  const classificationMatch = startsWithAny(
+    item?.classificationCode,
+    classificationPrefixes,
+  );
+  if (classificationMatch) return true;
+
+  // Criteria 4: industry day title keyword match + org full path includes "food"
+  const fullPath = (item?.fullParentPathName ?? "").toLowerCase();
+  if (fullPath.includes("food")) return true;
+
+  return false;
 };
 
 export const matchesOpportunitySolicitation = (item) => {
