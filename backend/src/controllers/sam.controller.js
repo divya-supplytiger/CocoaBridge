@@ -1,7 +1,8 @@
-import { SourceSystem } from "@prisma/client";
+import { SourceSystem, AcquisitionPath } from "@prisma/client";
 import { ENV } from "../config/env.js";
 import axios from "axios";
 import prisma from "../config/db.js";
+import { inngestClient, emitInternalEventSafe } from "../config/inngestClient.js";
 import {
   extractContact,
   extractOrganizationChain,
@@ -24,7 +25,8 @@ import {
   toMMDDYYYY,
 } from "../utils/normalizeSAM.js";
 
-import { samGovIndustryDayPTypes, samGovSolicitationPTypes } from "../utils/globals.js";
+import { MICROPURCHASE_THRESHOLD, samGovIndustryDayPTypes, samGovSolicitationPTypes } from "../utils/globals.js";
+
 /*
   Helper functions to fetch opportunities from SAM.gov with pagination
 
@@ -290,6 +292,11 @@ async function upsertAwardAndRecipientFromSam(
       },
     });
   }
+  const existingAward = await db.award.findUnique({
+    where: { externalId: award.externalId },
+    select: { id: true },
+  });
+
   // 2) Upsert Award, link to Recipient
   const awardRecord = await db.award.upsert({
     where: { externalId: award.externalId },
@@ -315,6 +322,22 @@ async function upsertAwardAndRecipientFromSam(
       recipientId: recipient ? recipient.id : null,
     },
   });
+
+  const isMicrosaction = award.obligatedAmount && award.obligatedAmount < MICROPURCHASE_THRESHOLD;
+
+
+  await emitInternalEventSafe("internal/award.upserted", {
+    source: awardRecord.source,
+    awardId: awardRecord.id,
+    opportunityId,
+    op: existingAward ? "UPDATED" : "CREATED",
+    title: null,
+    summary: null,
+    buyingOrganizationId: awardRecord.buyingOrganizationId ?? null,
+    // Default acquisition path for awards until classification rules are added.
+    acquisitionPath: isMicrosaction ? AcquisitionPath.MICROPURCHASE : AcquisitionPath.OPEN_MARKET,
+  });
+
   return awardRecord;
 }
 
@@ -418,10 +441,28 @@ async function upsertOpportunityFromSam(prisma, opportunity) {
     countryCode: normalized.countryCode ?? null,
   };
 
+  const existingOpportunity = await prisma.opportunity.findUnique({
+    where: { noticeId: normalized.noticeId },
+    select: { id: true },
+  });
+
   const opp = await prisma.opportunity.upsert({
     where: { noticeId: normalized.noticeId },
     update: data,
     create: { ...data, description: null },
+  });
+
+  await emitInternalEventSafe("internal/opportunity.upserted", {
+    source: opp.source,
+    opportunityId: opp.id,
+    op: existingOpportunity ? "UPDATED" : "CREATED",
+    title: opp.title ?? null,
+    summary: opp.description ?? null,
+    type: opp.type ?? "OTHER",
+    tag: opp.tag ?? "GENERAL",
+    buyingOrganizationId: opp.buyingOrganizationId ?? null,
+    // TODOL Default acquisition path until opportunity classification is implemented.
+    acquisitionPath: AcquisitionPath.OPEN_MARKET,
   });
 
   // Upsert award and recipient associated with this opportunity

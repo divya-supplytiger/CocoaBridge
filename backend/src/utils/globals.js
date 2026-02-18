@@ -67,7 +67,7 @@ export const naicsPrefixes = [
 export const validCountries = ["USA", "US"];
 
 // USASpending filter presets for common searches
-const UPPER_BOUND = 10000000;
+export const MICROPURCHASE_THRESHOLD = 10000;
 export const usaSpendingFilters = {
   searchByAward: {
     link: "/api/v2/search/spending_by_award/",
@@ -119,7 +119,7 @@ export const usaSpendingFilters = {
             end_date: "2026-09-30",
           },
         ],
-        award_amounts: [{ upper_bound: UPPER_BOUND }],
+        award_amounts: [{ upper_bound: MICROPURCHASE_THRESHOLD }],
         award_type_codes: ["A", "B", "C"],
         naics_codes: naicsPrefixes,
         psc_codes: {

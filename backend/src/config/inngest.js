@@ -1,5 +1,10 @@
-import { Inngest } from "inngest";
-import {ENV } from "../config/env.js";
+import {
+  AcquisitionPath,
+  OppTag,
+  Type,
+} from "@prisma/client";
+import prisma from "./db.js";
+import { inngestClient } from "./inngestClient.js";
 import {
   createUser,
   updateUser,
@@ -9,11 +14,9 @@ import {
 } from "../controllers/db.controller.js";
 import { runCurrentOpportunitiesSyncFromSam } from "../controllers/sam.controller.js";
 import { runAwardsSyncFromUsaspending } from "../controllers/usaspending.controller.js";
-// Initialize Inngest with your account's unique identifier to link events and functions
-export const inngest = new Inngest({
-  name: "SupplyTigerGOA Inngest Client",
-  id: ENV.INNGEST_ID,
-});
+
+// Public export consumed by server route registration.
+export const inngest = inngestClient;
 
 // Every time a new user is created in Clerk, sync them to our database
 const syncUser = inngest.createFunction(
@@ -55,6 +58,122 @@ const deleteUserInDB = inngest.createFunction(
     console.log("{DEBUG} User deleted event received:", event);
     await deleteUser(event);
   }
+);
+
+// Converts internal "opportunity upserted" events into a single idempotent InboxItem row.
+const upsertInboxItemFromOpportunityEvent = inngest.createFunction(
+  {
+    id: "upsert-inbox-item-from-opportunity-event",
+    name: "Upsert InboxItem from Opportunity Event",
+    description:
+      "Creates or updates InboxItem for an opportunity using source+opportunityId idempotency",
+  },
+  { event: "internal/opportunity.upserted" },
+  async ({ event }) => {
+    const data = event?.data ?? {};
+
+    if (!data?.opportunityId || !data?.source) {
+      return {
+        skipped: true,
+        reason: "Missing source or opportunityId",
+      };
+    }
+
+    const source = data.source;
+
+    const inboxItem = await prisma.inboxItem.upsert({
+      where: {
+        source_opportunityId: {
+          source,
+          opportunityId: data.opportunityId,
+        },
+      },
+      update: {
+        acquisitionPath: data.acquisitionPath ?? AcquisitionPath.OPEN_MARKET,
+        type: data.type ?? Type.OTHER,
+        tag: data.tag ?? OppTag.GENERAL,
+        title: data.title ?? null,
+        summary: data.summary ?? null,
+        buyingOrganizationId: data.buyingOrganizationId ?? null,
+      },
+      create: {
+        source,
+        acquisitionPath: data.acquisitionPath ?? AcquisitionPath.OPEN_MARKET,
+        type: data.type ?? Type.OTHER,
+        tag: data.tag ?? OppTag.GENERAL,
+        title: data.title ?? null,
+        summary: data.summary ?? null,
+        buyingOrganizationId: data.buyingOrganizationId ?? null,
+        opportunityId: data.opportunityId,
+      },
+    });
+
+    return {
+      ok: true,
+      inboxItemId: inboxItem.id,
+      source,
+      opportunityId: data.opportunityId,
+      op: data.op ?? "UPSERTED",
+    };
+  },
+);
+
+// Converts internal "award upserted" events into a single idempotent InboxItem row.
+const upsertInboxItemFromAwardEvent = inngest.createFunction(
+  {
+    id: "upsert-inbox-item-from-award-event",
+    name: "Upsert InboxItem from Award Event",
+    description:
+      "Creates or updates InboxItem for an award using source+awardId idempotency",
+  },
+  { event: "internal/award.upserted" },
+  async ({ event }) => {
+    const data = event?.data ?? {};
+
+    if (!data?.awardId || !data?.source) {
+      return {
+        skipped: true,
+        reason: "Missing source or awardId",
+      };
+    }
+
+    const source = data.source;
+
+    const inboxItem = await prisma.inboxItem.upsert({
+      where: {
+        source_awardId: {
+          source,
+          awardId: data.awardId,
+        },
+      },
+      update: {
+        acquisitionPath: data.acquisitionPath ?? AcquisitionPath.OPEN_MARKET,
+        type: data.type ?? Type.OTHER,
+        tag: data.tag ?? OppTag.GENERAL,
+        title: data.title ?? null,
+        summary: data.summary ?? null,
+        buyingOrganizationId: data.buyingOrganizationId ?? null,
+      },
+      create: {
+        source,
+        acquisitionPath: data.acquisitionPath ?? AcquisitionPath.OPEN_MARKET,
+        type: data.type ?? Type.OTHER,
+        tag: data.tag ?? OppTag.GENERAL,
+        title: data.title ?? null,
+        summary: data.summary ?? null,
+        buyingOrganizationId: data.buyingOrganizationId ?? null,
+        awardId: data.awardId,
+      },
+    });
+
+    return {
+      ok: true,
+      inboxItemId: inboxItem.id,
+      source,
+      awardId: data.awardId,
+      op: data.op ?? "UPSERTED",
+    };
+  },
 );
 
 // CRON JOBS
@@ -113,8 +232,8 @@ export const syncCurrentSamOpportunitiesDaily = inngest.createFunction(
 // Sync awards from USASpending every 3 days
 export const syncAwardsFromUsaspendingBiWeekly = inngest.createFunction(
   {
-    id: "sync-awards-from-usaspending",
-    name: "Sync USASpending Awards",
+    id: "sync-awards-from-usaspending-biweekly",
+    name: "Sync USASpending Awards Bi-Weekly",
     description:
       "Cron job to sync awards from USASpending.gov to the database every 3 days at 1:00 AM EST",
   },
@@ -132,6 +251,8 @@ export const functions = [
   syncUser,
   updateUserInDB,
   deleteUserInDB,
+  upsertInboxItemFromOpportunityEvent,
+  upsertInboxItemFromAwardEvent,
   deactivateExpiredOpportunitiesDaily,
   syncCurrentSamOpportunitiesDaily,
   getOpportunityDescriptionsFromSamDaily,

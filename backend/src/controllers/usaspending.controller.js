@@ -1,13 +1,15 @@
 import axios from "axios";
 import { ENV } from "../config/env.js";
 import prisma from "../config/db.js";
+import { AcquisitionPath } from "@prisma/client";
+import { inngestClient, emitInternalEventSafe } from "../config/inngestClient.js";
 import {
   normalizeUSASpendingAward,
   extractRecipientFromUSASpending,
   extractAwardingOrgsFromUSASpending,
 } from "../utils/normalizeUSASpending.js";
 
-import { usaSpendingFilters } from "../utils/globals.js";
+import { usaSpendingFilters, MICROPURCHASE_THRESHOLD } from "../utils/globals.js";
 
 /* 
 HELPER FUNCTIONS TO UPSERT DATA
@@ -131,6 +133,11 @@ export const upsertAwardFromUSASpending = async (usaAward) => {
   const orgs = extractAwardingOrgsFromUSASpending(usaAward);
   const buyingOrganizationId = await upsertBuyingOrgChainFromUSASpending(orgs);
 
+  const existingAward = await prisma.award.findUnique({
+    where: { externalId: normalized.externalId },
+    select: { id: true },
+  });
+
   // 4. Upsert the Award
   const award = await prisma.award.upsert({
     where: { externalId: normalized.externalId },
@@ -144,6 +151,19 @@ export const upsertAwardFromUSASpending = async (usaAward) => {
       recipientId,
       buyingOrganizationId,
     },
+  });
+
+  const isMicrosaction = award.obligatedAmount && award.obligatedAmount < MICROPURCHASE_THRESHOLD;
+
+  await emitInternalEventSafe("internal/award.upserted", {
+    source: award.source,
+    awardId: award.id,
+    op: existingAward ? "UPDATED" : "CREATED",
+    title: null,
+    summary: award.description ?? null,
+    buyingOrganizationId: award.buyingOrganizationId ?? null,
+    // Default acquisition path for awards until classification rules are added.
+    acquisitionPath: isMicrosaction ? AcquisitionPath.MICROPURCHASE : AcquisitionPath.OPEN_MARKET,
   });
 
   return award;

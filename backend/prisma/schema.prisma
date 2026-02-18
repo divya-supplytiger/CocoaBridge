@@ -340,6 +340,8 @@ model InboxItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([source, opportunityId])
+  @@unique([source, awardId])
   @@index([reviewStatus])
   @@index([acquisitionPath])
   @@index([type])
