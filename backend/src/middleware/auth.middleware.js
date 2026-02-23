@@ -1,5 +1,6 @@
 import { requireAuth } from "@clerk/express";
 import { UserRole } from "@prisma/client";
+import prisma from "../config/db.js";
 
 export const protectRoute = [
   requireAuth(),
@@ -12,7 +13,7 @@ export const protectRoute = [
         });
       }
 
-      const user = await req.prisma.user.findUnique({
+      const user = await prisma.user.findUnique({
         where: { clerkId },
       });
       if (!user) {

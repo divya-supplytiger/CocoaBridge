@@ -15,7 +15,15 @@ if (!PUBLISHABLE_KEY) {
 }
 
 // create a react-query client
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+    },
+  },
+});
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

@@ -15,6 +15,7 @@ export const ENV = {
   SAMGOV_NOTICE_DESC_URL: process.env.SAMGOV_NOTICE_DESC_URL,
   NEON_DB_API: process.env.NEON_DB_API,
   INNGEST_ID: process.env.INNGEST_ID,
+  CLERK_JWKS_URL: process.env.CLERK_JWKS_URL,
   ADMIN_EMAILS: process.env.ADMIN_EMAILS
     ? process.env.ADMIN_EMAILS.split(",").map((e) => e.trim().toLowerCase())
     : [],
