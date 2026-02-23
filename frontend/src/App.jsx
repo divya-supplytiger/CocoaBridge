@@ -18,6 +18,7 @@ import Awards from "./pages/AwardsPage";
 import InboxItemDetail from "./pages/InboxItemDetail";
 import OpportunityDetail from "./pages/OpportunityDetail";
 import AwardDetail from "./pages/AwardDetail";
+import NotFoundPage from "./pages/NotFoundPage";
 
 function App() {
   const { isSignedIn, isLoaded } = useAuth();
@@ -48,6 +49,7 @@ function App() {
         <Route path="awards/:id" element={<AwardDetail />} />
         <Route path="inbox/:id" element={<InboxItemDetail />} />
       </Route>
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

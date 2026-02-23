@@ -30,10 +30,12 @@ router.delete("/inbox-items/:id", ...protectRoute, adminOnly, deleteInboxItem);
 // Opportunities
 router.get("/opportunities", ...protectRoute, listOpportunities);
 router.get("/opportunities/:id", ...protectRoute, getOpportunity);
+// TODO: delete opportunity
 
 // Awards
 router.get("/awards", ...protectRoute, listAwards);
 router.get("/awards/:id", ...protectRoute, getAward);
+// TODO: delete award
 
 // Industry Days
 router.get("/industry-days", ...protectRoute, listIndustryDays);

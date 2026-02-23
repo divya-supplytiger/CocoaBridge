@@ -572,3 +572,5 @@ export const getBuyingOrg = async (req, res) => {
     return res.status(500).json({ error: "Internal server error", details: error.message });
   }
 };
+
+// --- TODO: Contact and Recipient controllers ---
