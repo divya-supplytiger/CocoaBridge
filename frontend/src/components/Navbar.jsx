@@ -14,15 +14,12 @@ const Navbar = () => {
     </label>
     {/* dynamic title based on the current path */}
     <div className="flex-1 px-4">
-
         <h1 className="text-2xl font-bold">{NAVIGATION_LINKS.find((item => item.path === location.pathname))?.name || "Dashboard"}</h1>
         </div>
-
     {/* user profile */}
     <div className="mr-5">
         <UserButton className="size-5"/>
     </div>
-
 </div>
 );
 }

@@ -15,10 +15,13 @@ if (!PUBLISHABLE_KEY) {
 }
 
 // create a react-query client
+const STALE_TIME = import.meta.env.VITE_ENV === "development" ? Infinity : 30 * 60 * 1000;
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30 * 60 * 1000,
+      staleTime: STALE_TIME,
+      gcTime: STALE_TIME,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
     },

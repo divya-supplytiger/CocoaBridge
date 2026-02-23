@@ -13,7 +13,7 @@ const STATUS_BADGE = {
 };
 
 const columns = [
-  { accessor: "title", header: "Title" },
+  { accessor: "title", header: "Title", render: (val) => val ?? "—" },
   { accessor: "type", header: "Type" },
   {
     accessor: "reviewStatus",

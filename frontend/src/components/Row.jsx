@@ -6,7 +6,7 @@ const Row = ({ children, onClick }) => {
       onClick={onClick}
       className={onClick ? "cursor-pointer hover:bg-base-300" : ""}
     >
-      {children}
+      {children ? children : "-"}
     </tr>
   )
 };
