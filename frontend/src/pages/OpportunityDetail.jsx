@@ -22,11 +22,11 @@ const OpportunityDetail = () => {
 
   const badges = (
     <>
-      {item?.type && <span className="badge badge-outline">{item.type}</span>}
-      <span className={`badge ${item?.active ? "badge-success" : "badge-error"}`}>
+      {item?.type && <span className="badge badge-info badge-outline">{item.type}</span>}
+      <span className={`badge badge-outline ${item?.active ? "badge-success" : "badge-error"}`}>
         {item?.active ? "Active" : "Inactive"}
       </span>
-      {item?.setAside && <span className="badge badge-outline">{item.setAside}</span>}
+      {item?.setAside && <span className="badge badge-warning badge-outline">{item.setAside}</span>}
     </>
   );
 

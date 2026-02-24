@@ -54,7 +54,8 @@ const InboxPage = () => {
 
   const columns = [
     { accessor: "title", header: "Title", render: (val) => val ?? "—" },
-    { accessor: "type", header: "Type" },
+    { accessor: "type", header: "Type",     render: (val) => val ? <span className="badge badge-info text-white">{val}</span> : "—",
+ },
     {
       accessor: "reviewStatus",
       header: "Status",
@@ -74,7 +75,7 @@ const InboxPage = () => {
             ))}
           </select>
         ) : (
-          <span className={`badge ${STATUS_BADGE[val] ?? "badge-neutral"}`}>{val}</span>
+          <span className={`badge ${STATUS_BADGE[val] ?? "badge-neutral"} bg-white text-black`}>{val}</span>
         ),
     },
     { accessor: "acquisitionPath", header: "Path" },

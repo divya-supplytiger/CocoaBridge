@@ -7,8 +7,7 @@ import Table from "../components/Table.jsx";
 
 const columns = [
   { accessor: "title", header: "Title" },
-  { accessor: "type", header: "Type" },
-    {
+  {
     accessor: "pscCode",
     header: "PSC",
     render: (val) => val ?? "—",
@@ -18,27 +17,35 @@ const columns = [
     header: "NAICS Codes",
     render: (val) => val?.length > 0 ? val.join(", ") : "—",
   },
-
-  {
-    accessor: "setAside",
-    header: "Set Aside",
-    render: (val) => val ?? "—",
-  },
-  {
+    {
     accessor: "responseDeadline",
     header: "Deadline",
     render: (val) => (val ? new Date(val).toLocaleDateString() : "—"),
+  },
+  {
+    accessor: "setAside",
+    header: "Set Aside",
+    render: (val) => val ? <span className="badge badge-warning text-white">{val}</span> : "—",
+  },
+    {
+    accessor: "type",
+    header: "Type",
+    render: (val) => val ? <span className="badge badge-info text-white">{val}</span> : "—",
   },
 
   {
     accessor: "state",
     header: "State",
-    render: (val) => val ?? "—",
+    render: (val) => val ? <span className="badge badge-primary text-white">{val}</span> : "—",
   },
   {
     accessor: "active",
-    header: "Active",
-    render: (val) => (val ? "Yes" : "No"),
+    header: "Status",
+    render: (val) => (
+      <span className={`badge ${val ? "badge-success" : "badge-error"} text-white`}>
+        {val ? "Active" : "Inactive"}
+      </span>
+    ),
   },
 ];
 
