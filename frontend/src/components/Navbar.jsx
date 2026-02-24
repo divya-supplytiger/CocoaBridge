@@ -28,7 +28,7 @@ const Navbar = () => {
     };
 
     return (
-        <div className="navbar w-full bg-secondary">
+        <div className="navbar w-full bg-secondary text-secondary-content relative">
             {/* button to open sidebar on small screens */}
             <label htmlFor="my-drawer" className="btn btn-square btn-ghost" aria-label="open sidebar">
                 <PanelLeftIcon className="size-5" />
@@ -57,19 +57,27 @@ const Navbar = () => {
                     />
                 </div>
 
-                {open && results.length > 0 && (
+                {open && query.trim() && (
                     <ul className="absolute right-0 mt-1 w-48 bg-base-100 shadow-lg rounded-box border border-base-300 z-50 py-1">
-                        {results.map((item) => (
-                            <li key={item.path}>
-                                <button
-                                    className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-base-200 text-left"
-                                    onMouseDown={() => handleSelect(item.path)}
-                                >
-                                    {item.icon}
-                                    {item.name}
-                                </button>
+                        {results.length === 0 ? (
+                            <li>
+                                <span className="flex items-center px-3 py-2 text-sm text-base-content/50">
+                                    No results found
+                                </span>
                             </li>
-                        ))}
+                        ) : (
+                            results.map((item) => (
+                                <li key={item.path}>
+                                    <button
+                                        className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-base-200 text-left"
+                                        onMouseDown={() => handleSelect(item.path)}
+                                    >
+                                        {item.icon}
+                                        {item.name}
+                                    </button>
+                                </li>
+                            ))
+                        )}
                     </ul>
                 )}
             </div>

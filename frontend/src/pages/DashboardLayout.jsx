@@ -26,7 +26,7 @@ const DashboardLayout = () => {
                     className="drawer-toggle"
                     defaultChecked
                 />
-                <div className="drawer-content flex flex-col min-h-screen">
+                <div className="drawer-content flex flex-col min-h-screen bg-accent/20 text-accent-content">
                     <Navbar />
                     <div className="p-4 flex-1">
                         <Outlet />

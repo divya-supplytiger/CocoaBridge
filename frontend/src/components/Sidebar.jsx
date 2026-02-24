@@ -20,33 +20,19 @@ const Sidebar = () => {
                 className="drawer-overlay"
             ></label>
 
-            <div className="flex min-h-full flex-col bg-base-200 is-drawer-close:w-14 is-drawer-open:w-64 transition-all duration-200">
+            <div className="flex min-h-full flex-col bg-secondary/40 is-drawer-close:w-14 is-drawer-open:w-64 transition-all duration-200">
 
                 {/* sidebar header */}
-                <div className="p-4 w-full">
+                <div className="p-4 w-full bg-primary">
                     <div className="flex items-center gap-3 is-drawer-close:justify-center">
                         <img
                             src="st-icon-logo.jpg"
                             alt="SupplyTiger Logo"
-                            className="size-10 bg-primary rounded-xl flex items-center justify-center shrink-0"
+                            className="size-10 rounded-xl flex items-center justify-center shrink-0"
                         />
-                        <span className="text-3xl harletitle is-drawer-close:hidden">SupplyTiger</span>
+                        <span className="text-3xl harletitle is-drawer-close:hidden text-secondary-content">SupplyTiger</span>
                     </div>
                 </div>
-
-                {/* search bar placeholder */}
-                <div className="px-4 py-2 is-drawer-close:hidden">
-                    <div className="relative">
-                        <input
-                            type="text"
-                            placeholder="Search..."
-                            className="input input-sm w-full pl-8"
-                            readOnly
-                        />
-                        <Search className="size-4 absolute left-2 top-1/2 transform -translate-y-1/2" />
-                    </div>
-                </div>
-
 
                 {/* main navigation links */}
                 <ul className="menu w-full grow flex flex-col gap-2">
@@ -57,7 +43,7 @@ const Sidebar = () => {
                                 <Link
                                     to={item.path}
                                     data-tip={item.name}
-                                    className={`is-drawer-close:tooltip is-drawer-close:tooltip-right is-drawer-close:justify-center ${isActive ? "bg-primary text-primary-content" : ""}`}
+                                    className={`is-drawer-close:tooltip is-drawer-close:tooltip-right is-drawer-close:justify-center ${isActive ? "bg-primary/50 text-primary-content" : ""}`}
                                 >
                                     {item.icon}
                                     <span className="is-drawer-close:hidden">{item.name}</span>
@@ -79,7 +65,7 @@ const Sidebar = () => {
                                         <Link
                                             to={item.path}
                                             data-tip={item.name}
-                                            className={`is-drawer-close:tooltip is-drawer-close:tooltip-right is-drawer-close:justify-center ${isActive ? "bg-primary text-primary-content" : ""}`}
+                                            className={`is-drawer-close:tooltip is-drawer-close:tooltip-right is-drawer-close:justify-center ${isActive ? "bg-success text-success-content" : ""}`}
                                         >
                                             {item.icon}
                                             <span className="is-drawer-close:hidden">{item.name}</span>
@@ -92,7 +78,7 @@ const Sidebar = () => {
                 )}
 
                 {/* user info */}
-                <div className="p-4 w-full border-t border-base-300">
+                <div className="p-4 w-full border-t border-base-300 bg-primary text-primary-content">
                     <div className="flex items-center gap-3 is-drawer-close:justify-center">
                         <div className="avatar shrink-0">
                             <img

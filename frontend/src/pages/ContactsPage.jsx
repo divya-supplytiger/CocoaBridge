@@ -55,8 +55,7 @@ const ContactsPage = () => {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
-                  <Search className="size-4" />
-
+          <Search className="size-4" />
         <input
           type="text"
           placeholder="Search by name or email..."
@@ -76,6 +75,8 @@ const ContactsPage = () => {
         page={page}
         onPageChange={setPage}
         basePath="/contacts"
+        emptyMessage={debouncedSearch ? "No results found" : "No Contacts"}
+        emptySubMessage={debouncedSearch ? `No contacts match "${debouncedSearch}".` : "Contacts will appear here once available."}
       />
     </div>
   );

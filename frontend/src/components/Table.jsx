@@ -2,27 +2,27 @@ import React from 'react'
 import { useNavigate } from 'react-router'
 import Row from "./Row.jsx";
 
-const Table = ({ isLoading, isError, error, data, columns, meta, page, onPageChange, basePath }) => {
+const Table = ({ isLoading, isError, error, data, columns, meta, page, onPageChange, basePath, emptyMessage, emptySubMessage }) => {
   const navigate = useNavigate();
   const totalPages = meta ? Math.ceil(meta.total / meta.limit) : 1;
   const showPagination = meta && meta.total > meta.limit;
 
   return (
-    <div className="card bg-base-200 shadow-md">
+    <div className="card bg-base-100 text-primary-content shadow-md">
       <div className="card-body">
         {isLoading ? (
           <div className="flex justify-center py-12">
             <span className="loading loading-spinner loading-lg" />
           </div>
         ) : isError ? (
-          <div className="text-center py-12 text-base-content/60">
+          <div className="text-center py-12 text-accent-content/60">
             <p className="text-xl font-semibold mb-2">Oops!</p>
             <span className="text-red-500 text-sm">{error?.message ?? "Please try again"}</span>
           </div>
         ) : data.length === 0 ? (
-          <div className="text-center py-12 text-base-content/60">
-            <p className="text-xl font-semibold mb-2">No Data</p>
-            <p className="text-sm">Data will appear here once available.</p>
+          <div className="text-center py-12 text-accent-content/60">
+            <p className="text-xl font-semibold mb-2">{emptyMessage ?? "No Data"}</p>
+            <p className="text-sm">{emptySubMessage ?? "Data will appear here once available."}</p>
           </div>
         ) : (
           <>
@@ -53,19 +53,19 @@ const Table = ({ isLoading, isError, error, data, columns, meta, page, onPageCha
             </div>
             {showPagination && (
               <div className="flex justify-center mt-4">
-                <div className="join text-secondary-content">
+                <div className="join text-accent-content">
                   <button
-                    className="join-item btn bg-secondary border border-secondary-content"
+                    className="join-item btn bg-primary/80 border border-primary-content text-primary-content"
                     onClick={() => onPageChange(page - 1)}
                     disabled={page === 1}
                   >
                     Prev
                   </button>
-                  <button className="join-item btn bg-base-400 pointer-events-none border border-secondary-content">
+                  <button className="join-item btn bg-accent/80 pointer-events-none border border-accent-content text-accent-content">
                     Page {page} of {totalPages}
                   </button>
                   <button
-                    className="join-item btn bg-secondary border border-secondary-content"
+                    className="join-item btn bg-primary/80 border border-primary-content text-primary-content"
                     onClick={() => onPageChange(page + 1)}
                     disabled={page === totalPages}
                   >
