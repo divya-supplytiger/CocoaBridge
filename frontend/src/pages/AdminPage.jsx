@@ -21,7 +21,7 @@ const SYNC_JOBS = [
   { type: "sam-industry-days", label: "Industry Days" },
 ];
 
-function timeAgo(dateStr) {
+const timeAgo = (dateStr) => {
   if (!dateStr) return "Never";
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
@@ -32,7 +32,7 @@ function timeAgo(dateStr) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-function StatusBadge({ status }) {
+const StatusBadge = ({ status }) => {
   if (!status) return <span className="badge badge-ghost badge-sm">Never run</span>;
   if (status === "PARTIAL") return <span className="badge badge-warning badge-sm gap-1"><AlertCircle className="size-3" />Partial</span>;
   if (status === "SUCCESS") return <span className="badge badge-success badge-sm gap-1"><CheckCircle className="size-3" />Success</span>;
@@ -42,7 +42,7 @@ function StatusBadge({ status }) {
 
 // ─── User Management Section ─────────────────────────────────────────────────
 
-function UserManagement() {
+const UserManagement = () => {
   const currentUser = useCurrentUser();
   const queryClient = useQueryClient();
 
@@ -134,7 +134,7 @@ function UserManagement() {
 
 // ─── Sync Controls Section ────────────────────────────────────────────────────
 
-function SyncControls() {
+const SyncControls = () => {
   const queryClient = useQueryClient();
 
   const mutations = Object.fromEntries(
@@ -185,7 +185,7 @@ function SyncControls() {
 
 // ─── System Health Section ────────────────────────────────────────────────────
 
-function SystemHealth() {
+const SystemHealth = () => {
   const { data: health = [], isLoading } = useQuery({
     queryKey: ["systemHealth"],
     queryFn: adminApi.getSystemHealth,

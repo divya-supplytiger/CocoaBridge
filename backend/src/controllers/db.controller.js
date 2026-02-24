@@ -433,7 +433,13 @@ export const getOpportunity = async (req, res) => {
   try {
     const item = await prisma.opportunity.findUnique({
       where: { id: req.params.id },
-      include: { buyingOrganization: true, inboxItems: true, contactLinks: true },
+      include: {
+        buyingOrganization: true,
+        inboxItems: true,
+        contactLinks: {
+          include: { contact: { select: { id: true } } },
+        },
+      },
     });
     if (!item) return res.status(404).json({ error: "Opportunity not found" });
     return res.json({ data: item });
@@ -587,4 +593,59 @@ export const getBuyingOrg = async (req, res) => {
   }
 };
 
-// --- TODO: Contact and Recipient controllers ---
+// --- Contact controllers ---
+
+export const listContacts = async (req, res) => {
+  try {
+    const { page, limit, skip } = parsePagination(req.query);
+    const where = {};
+    if (req.query.search) {
+      where.OR = [
+        { fullName: { contains: req.query.search, mode: "insensitive" } },
+        { email: { contains: req.query.search, mode: "insensitive" } },
+      ];
+    }
+    const [total, items] = await Promise.all([
+      prisma.contact.count({ where }),
+      prisma.contact.findMany({
+        where,
+        orderBy: { fullName: "asc" },
+        skip,
+        take: limit,
+        include: {
+          links: {
+            where: { buyingOrganizationId: { not: null } },
+            take: 1,
+            include: { buyingOrganization: { select: { id: true, name: true } } },
+          },
+        },
+      }),
+    ]);
+    return res.json({ meta: { total, page, limit, returned: items.length }, data: items });
+  } catch (error) {
+    console.error("listContacts error:", error);
+    return res.status(500).json({ error: "Internal server error", details: error.message });
+  }
+};
+
+export const getContact = async (req, res) => {
+  try {
+    const item = await prisma.contact.findUnique({
+      where: { id: req.params.id },
+      include: {
+        links: {
+          include: {
+            opportunity: { select: { id: true, title: true } },
+            industryDay: { select: { id: true, title: true } },
+            buyingOrganization: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+    if (!item) return res.status(404).json({ error: "Contact not found" });
+    return res.json({ data: item });
+  } catch (error) {
+    console.error("getContact error:", error);
+    return res.status(500).json({ error: "Internal server error", details: error.message });
+  }
+};

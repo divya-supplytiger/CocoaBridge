@@ -2,6 +2,7 @@ import { useParams } from 'react-router';
 import { useQuery } from "@tanstack/react-query";
 import { dbApi } from "../lib/api.js";
 import ItemDetail from "../components/ItemDetail.jsx";
+import RelatedRecordsCard from "../components/RelatedRecordsCard.jsx";
 
 const OpportunityDetail = () => {
   const { id } = useParams();
@@ -12,6 +13,12 @@ const OpportunityDetail = () => {
   });
 
   const item = result?.data;
+
+  const contactLinks = item?.contactLinks?.map((cl) => ({
+    id: cl.id,
+    to: `/contacts/${cl.contact.id}`,
+    type: cl.type,
+  })) ?? [];
 
   const badges = (
     <>
@@ -33,18 +40,23 @@ const OpportunityDetail = () => {
   ];
 
   return (
-    <ItemDetail
-      isLoading={isLoading}
-      isError={isError}
-      error={error}
-      item={item}
-      backTo="/opportunities"
-      backLabel="Back to Opportunities"
-      title={item?.title ?? "Untitled"}
-      badges={badges}
-      description={item?.description}
-      fields={fields}
-    />
+    <div>
+      <ItemDetail
+        isLoading={isLoading}
+        isError={isError}
+        error={error}
+        item={item}
+        backTo="/opportunities"
+        backLabel="Back to Opportunities"
+        title={item?.title ?? "Untitled"}
+        badges={badges}
+        description={item?.description}
+        fields={fields}
+      />
+      {item && (
+        <RelatedRecordsCard contactLinks={contactLinks} />
+      )}
+    </div>
   );
 };
 
