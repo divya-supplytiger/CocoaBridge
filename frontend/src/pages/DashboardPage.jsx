@@ -22,7 +22,7 @@ const DashboardPage = () => {
 
   return (
     <div>
-      DashboardPage
+      I have made a code change but I need feedback before pushing.
     </div>
   );
 };
