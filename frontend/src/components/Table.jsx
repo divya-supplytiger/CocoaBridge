@@ -53,19 +53,19 @@ const Table = ({ isLoading, isError, error, data, columns, meta, page, onPageCha
             </div>
             {showPagination && (
               <div className="flex justify-center mt-4">
-                <div className="join">
+                <div className="join text-secondary-content">
                   <button
-                    className="join-item btn"
+                    className="join-item btn bg-secondary border border-secondary-content"
                     onClick={() => onPageChange(page - 1)}
                     disabled={page === 1}
                   >
                     Prev
                   </button>
-                  <button className="join-item btn pointer-events-none">
+                  <button className="join-item btn bg-base-400 pointer-events-none border border-secondary-content">
                     Page {page} of {totalPages}
                   </button>
                   <button
-                    className="join-item btn"
+                    className="join-item btn bg-secondary border border-secondary-content"
                     onClick={() => onPageChange(page + 1)}
                     disabled={page === totalPages}
                   >

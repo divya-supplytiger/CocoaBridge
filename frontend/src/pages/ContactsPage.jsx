@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { dbApi } from "../lib/api.js";
+import { Search } from "lucide-react";
 import Table from "../components/Table.jsx";
 
 const columns = [
@@ -53,13 +54,18 @@ const ContactsPage = () => {
 
   return (
     <div className="flex flex-col gap-4">
-      <input
-        type="text"
-        placeholder="Search by name or email..."
-        className="input input-bordered w-full max-w-sm"
-        value={search}
-        onChange={handleSearchChange}
-      />
+      <div className="flex items-center gap-2">
+                  <Search className="size-4" />
+
+        <input
+          type="text"
+          placeholder="Search by name or email..."
+          className="input input-bordered w-full max-w-sm"
+          value={search}
+          onChange={handleSearchChange}
+          />
+
+      </div>
       <Table
         columns={columns}
         data={result?.data ?? []}
