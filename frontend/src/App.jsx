@@ -11,6 +11,8 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import CalendarPage from "./pages/CalendarPage";
 import ContactsPage from "./pages/ContactsPage";
 import ContactDetail from "./pages/ContactDetail";
+import RecipientDetail from "./pages/RecipientDetail";
+import BuyingOrgDetail from "./pages/BuyingOrgDetail";
 import AdminPage from "./pages/AdminPage";
 import PageLoader from "./components/PageLoader";
 import Opportunities from "./pages/OpportunitiesPage";
@@ -58,6 +60,8 @@ function App() {
         <Route path="calendar" element={<DataOnlyRoute><CalendarPage /></DataOnlyRoute>} />
         <Route path="contacts" element={<DataOnlyRoute><ContactsPage /></DataOnlyRoute>} />
         <Route path="contacts/:id" element={<DataOnlyRoute><ContactDetail /></DataOnlyRoute>} />
+        <Route path="recipients/:id" element={<DataOnlyRoute><RecipientDetail /></DataOnlyRoute>} />
+        <Route path="buying-orgs/:id" element={<DataOnlyRoute><BuyingOrgDetail /></DataOnlyRoute>} />
         <Route path="admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />

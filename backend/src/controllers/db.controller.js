@@ -593,6 +593,50 @@ export const getBuyingOrg = async (req, res) => {
   }
 };
 
+// --- Recipient controllers ---
+
+export const listRecipients = async (req, res) => {
+  try {
+    const { page, limit, skip } = parsePagination(req.query);
+    const where = {};
+    if (req.query.search) {
+      where.OR = [
+        { name: { contains: req.query.search, mode: "insensitive" } },
+        { uei: { contains: req.query.search, mode: "insensitive" } },
+      ];
+    }
+    const [total, items] = await Promise.all([
+      prisma.recipient.count({ where }),
+      prisma.recipient.findMany({
+        where,
+        orderBy: { name: "asc" },
+        skip,
+        take: limit,
+      }),
+    ]);
+    return res.json({ meta: { total, page, limit, returned: items.length }, data: items });
+  } catch (error) {
+    console.error("listRecipients error:", error);
+    return res.status(500).json({ error: "Internal server error", details: error.message });
+  }
+};
+
+export const getRecipient = async (req, res) => {
+  try {
+    const item = await prisma.recipient.findUnique({
+      where: { id: req.params.id },
+      include: {
+        awards: { take: 20, orderBy: { startDate: "desc" } },
+      },
+    });
+    if (!item) return res.status(404).json({ error: "Recipient not found" });
+    return res.json({ data: item });
+  } catch (error) {
+    console.error("getRecipient error:", error);
+    return res.status(500).json({ error: "Internal server error", details: error.message });
+  }
+};
+
 // --- Contact controllers ---
 
 export const listContacts = async (req, res) => {

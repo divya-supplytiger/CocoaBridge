@@ -14,6 +14,8 @@ import {
   updateIndustryDay,
   listBuyingOrgs,
   getBuyingOrg,
+  listRecipients,
+  getRecipient,
   listContacts,
   getContact,
 } from "../controllers/db.controller.js";
@@ -51,6 +53,10 @@ router.patch("/industry-days/:id", ...protectRoute, adminOnly, updateIndustryDay
 // Buying Organizations
 router.get("/buying-orgs", ...protectRoute, readOnlyOrAbove, listBuyingOrgs);
 router.get("/buying-orgs/:id", ...protectRoute, readOnlyOrAbove, getBuyingOrg);
+
+// Recipients
+router.get("/recipients", ...protectRoute, readOnlyOrAbove, listRecipients);
+router.get("/recipients/:id", ...protectRoute, readOnlyOrAbove, getRecipient);
 
 // Contacts
 router.get("/contacts", ...protectRoute, readOnlyOrAbove, listContacts);

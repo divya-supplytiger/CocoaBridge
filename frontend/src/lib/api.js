@@ -59,6 +59,15 @@ export const dbApi = {
     const { data } = await axiosInstance.get(`/db/buying-orgs/${id}`);
     return data;
   },
+  // Recipients
+  listRecipients: async (params) => {
+    const { data } = await axiosInstance.get("/db/recipients", { params });
+    return data;
+  },
+  getRecipient: async (id) => {
+    const { data } = await axiosInstance.get(`/db/recipients/${id}`);
+    return data;
+  },
   // Contacts
   listContacts: async (params) => {
     const { data } = await axiosInstance.get("/db/contacts", { params });
