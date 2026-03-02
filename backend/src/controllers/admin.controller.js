@@ -236,7 +236,7 @@ export const getFilterConfig = async (req, res) => {
       where: { key: { in: VALID_CONFIG_KEYS } },
     });
     const config = Object.fromEntries(rows.map((r) => [r.key, r.values]));
-    return res.json(config);
+    return res.status(200).json(config);
   } catch (error) {
     console.error("Error fetching filter config:", error);
     return res.status(500).json({ message: "Internal server error" });
@@ -260,7 +260,7 @@ export const updateFilterConfig = async (req, res) => {
       update: { values },
       create: { key, values },
     });
-    return res.json({ key: updated.key, values: updated.values });
+    return res.status(200).json({ key: updated.key, values: updated.values });
   } catch (error) {
     console.error(`Error updating filter config key ${key}:`, error);
     return res.status(500).json({ message: "Internal server error" });
