@@ -167,7 +167,7 @@ const SyncControls = () => {
         return (
           <button
             key={type}
-            className="btn btn-sm gap-2"
+            className="btn btn-sm gap-2 bg-accent-content/10 hover:bg-accent-content/20 border-0 text-accent-content"
             onClick={() => mutation.mutate()}
             disabled={mutation.isPending}
           >
@@ -292,7 +292,7 @@ const FilterListEditor = ({ sectionLabel, activeKey, bankKey, config }) => {
       {/* Active list */}
       <div className="flex flex-wrap gap-1.5 min-h-8">
         {activeValues.map((v) => (
-          <span key={v} className="badge badge-neutral gap-1">
+          <span key={v} className="badge badge-accent gap-1">
             {v}
             <button
               type="button"
@@ -393,6 +393,8 @@ const FilterListEditor = ({ sectionLabel, activeKey, bankKey, config }) => {
 };
 
 const FilterConfig = () => {
+  const [activeSection, setActiveSection] = useState(FILTER_SECTIONS[0].activeKey);
+
   const { data: config, isLoading } = useQuery({
     queryKey: ["filterConfig"],
     queryFn: adminApi.getFilterConfig,
@@ -406,19 +408,27 @@ const FilterConfig = () => {
     );
   }
 
+  const current = FILTER_SECTIONS.find((s) => s.activeKey === activeSection);
+
   return (
-    <div className="flex flex-col gap-6">
-      {FILTER_SECTIONS.map(({ label, activeKey, bankKey }) => (
-        <div key={activeKey}>
-          <FilterListEditor
-            sectionLabel={label}
-            activeKey={activeKey}
-            bankKey={bankKey}
-            config={config}
-          />
-          {activeKey !== "industryDayKeywords" && <div className="divider my-2" />}
-        </div>
-      ))}
+    <div className="flex flex-col gap-4">
+      <div className="join flex-wrap">
+        {FILTER_SECTIONS.map(({ label, activeKey }) => (
+          <button
+            key={activeKey}
+            className={`join-item btn btn-sm ${activeSection === activeKey ? "btn-primary" : "btn-ghost hover:bg-accent-content/40 border border-accent-content/40"}`}
+            onClick={() => setActiveSection(activeKey)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <FilterListEditor
+        sectionLabel={current.label}
+        activeKey={current.activeKey}
+        bankKey={current.bankKey}
+        config={config}
+      />
     </div>
   );
 };
@@ -428,7 +438,6 @@ const FilterConfig = () => {
 const AdminPage = () => {
   return (
     <div className="flex flex-col gap-8 max-w-5xl">
-      <h1 className="text-2xl font-bold">Admin</h1>
 
       {/* User Management */}
       <section className="card bg-base-100 shadow-sm border border-base-300">

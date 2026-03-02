@@ -106,13 +106,13 @@ const MarketIntelligencePage = () => {
     <div className="flex flex-col gap-4">
       <div className="join">
         <button
-          className={`join-item btn btn-sm ${activeTab === "recipients" ? "btn-primary" : "btn-ghost border border-base-300"}`}
+          className={`join-item btn btn-sm ${activeTab === "recipients" ? "btn-primary" : "btn-ghost hover:bg-accent-content/40 border border-accent-content/40"}`}
           onClick={() => setActiveTab("recipients")}
         >
           Recipients
         </button>
         <button
-          className={`join-item btn btn-sm ${activeTab === "buying-orgs" ? "btn-primary" : "btn-ghost border border-base-300"}`}
+          className={`join-item btn btn-sm ${activeTab === "buying-orgs" ? "btn-primary" : "btn-ghost hover:bg-accent-content/40 border border-accent-content/40"}`}
           onClick={() => setActiveTab("buying-orgs")}
         >
           Buying Agencies

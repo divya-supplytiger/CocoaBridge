@@ -124,7 +124,7 @@ const InboxItemDetail = () => {
                 placeholder="Add notes…"
               />
               <button
-                className="btn btn-sm btn-neutral self-end"
+                className="btn btn-sm btn-primary self-end"
                 disabled={isUpdating}
                 onClick={() => updateItem({ notes: notesValue })}
               >
