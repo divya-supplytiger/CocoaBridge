@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, AlertCircle, CheckCircle, XCircle, Clock, Loader2 } from "lucide-react";
+import { RefreshCw, AlertCircle, CheckCircle, XCircle, Clock, Loader2, ChevronDown, ChevronRight, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { adminApi } from "../lib/api.js";
 import { useCurrentUser } from "../lib/CurrentUserContext.jsx";
@@ -225,6 +226,203 @@ const SystemHealth = () => {
   );
 }
 
+// ─── Filter Configuration Section ────────────────────────────────────────────
+
+const FILTER_SECTIONS = [
+  { label: "Solicitation Keywords", activeKey: "solicitationKeywords", bankKey: "solicitationKeywordsBank" },
+  { label: "NAICS Codes", activeKey: "naicsCodes", bankKey: "naicsCodesBank" },
+  { label: "PSC Prefixes", activeKey: "pscPrefixes", bankKey: "pscPrefixesBank" },
+  { label: "Industry Day Keywords", activeKey: "industryDayKeywords", bankKey: "industryDayKeywordsBank" },
+];
+
+const FilterListEditor = ({ sectionLabel, activeKey, bankKey, config }) => {
+  const queryClient = useQueryClient();
+  const [activeInput, setActiveInput] = useState("");
+  const [bankInput, setBankInput] = useState("");
+  const [bankOpen, setBankOpen] = useState(false);
+
+  const activeValues = config[activeKey] ?? [];
+  const bankValues = config[bankKey] ?? [];
+
+  const { mutate: saveActive, isPending: savingActive } = useMutation({
+    mutationFn: (values) => adminApi.updateFilterConfig(activeKey, values),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["filterConfig"] });
+      toast.success(`${sectionLabel} saved`);
+    },
+    onError: () => toast.error(`Failed to save ${sectionLabel}`),
+  });
+
+  const { mutate: saveBank } = useMutation({
+    mutationFn: (values) => adminApi.updateFilterConfig(bankKey, values),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["filterConfig"] }),
+    onError: () => toast.error("Failed to update word bank"),
+  });
+
+  const addToActive = (value) => {
+    const v = value.trim();
+    if (!v || activeValues.includes(v)) return;
+    saveActive([...activeValues, v]);
+  };
+
+  const removeFromActive = (value) => {
+    saveActive(activeValues.filter((v) => v !== value));
+  };
+
+  const addToBank = (value) => {
+    const v = value.trim();
+    if (!v || bankValues.includes(v)) return;
+    saveBank([...bankValues, v]);
+  };
+
+  const removeFromBank = (value) => {
+    saveBank(bankValues.filter((v) => v !== value));
+  };
+
+  const moveChipToActive = (value) => {
+    if (!activeValues.includes(value)) {
+      saveActive([...activeValues, value]);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-sm font-semibold">{sectionLabel}</p>
+
+      {/* Active list */}
+      <div className="flex flex-wrap gap-1.5 min-h-8">
+        {activeValues.map((v) => (
+          <span key={v} className="badge badge-neutral gap-1">
+            {v}
+            <button
+              type="button"
+              className="hover:opacity-70"
+              onClick={() => removeFromActive(v)}
+            >
+              <X className="size-3" />
+            </button>
+          </span>
+        ))}
+        {activeValues.length === 0 && (
+          <span className="text-xs opacity-40 italic">No active values — sync runs without this filter</span>
+        )}
+      </div>
+
+      {/* Add input */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          className="input input-sm input-bordered flex-1 max-w-xs"
+          placeholder={`Add ${sectionLabel.toLowerCase()}…`}
+          value={activeInput}
+          onChange={(e) => setActiveInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              addToActive(activeInput);
+              setActiveInput("");
+            }
+          }}
+        />
+        <button
+          type="button"
+          className="btn btn-sm btn-primary"
+          disabled={savingActive || !activeInput.trim()}
+          onClick={() => { addToActive(activeInput); setActiveInput(""); }}
+        >
+          {savingActive ? <Loader2 className="size-3 animate-spin" /> : "Add"}
+        </button>
+      </div>
+
+      {/* Word bank */}
+      <div>
+        <button
+          type="button"
+          className="flex items-center gap-1 text-xs opacity-60 hover:opacity-90"
+          onClick={() => setBankOpen((o) => !o)}
+        >
+          {bankOpen ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+          Word bank ({bankValues.length})
+        </button>
+        {bankOpen && (
+          <div className="mt-2 flex flex-col gap-2">
+            <div className="flex flex-wrap gap-1.5">
+              {bankValues.map((v) => (
+                <span key={v} className="badge badge-outline gap-1 cursor-pointer hover:badge-primary" onClick={() => moveChipToActive(v)}>
+                  {v}
+                  <button
+                    type="button"
+                    className="hover:opacity-70"
+                    onClick={(e) => { e.stopPropagation(); removeFromBank(v); }}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </span>
+              ))}
+              {bankValues.length === 0 && (
+                <span className="text-xs opacity-40 italic">Bank is empty</span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                className="input input-xs input-bordered flex-1 max-w-xs"
+                placeholder="Add to bank…"
+                value={bankInput}
+                onChange={(e) => setBankInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    addToBank(bankInput);
+                    setBankInput("");
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="btn btn-xs btn-ghost border border-base-300"
+                disabled={!bankInput.trim()}
+                onClick={() => { addToBank(bankInput); setBankInput(""); }}
+              >
+                Add to bank
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const FilterConfig = () => {
+  const { data: config, isLoading } = useQuery({
+    queryKey: ["filterConfig"],
+    queryFn: adminApi.getFilterConfig,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-8">
+        <Loader2 className="size-6 animate-spin opacity-50" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {FILTER_SECTIONS.map(({ label, activeKey, bankKey }) => (
+        <div key={activeKey}>
+          <FilterListEditor
+            sectionLabel={label}
+            activeKey={activeKey}
+            bankKey={bankKey}
+            config={config}
+          />
+          {activeKey !== "industryDayKeywords" && <div className="divider my-2" />}
+        </div>
+      ))}
+    </div>
+  );
+};
+
 // ─── AdminPage ────────────────────────────────────────────────────────────────
 
 const AdminPage = () => {
@@ -256,6 +454,17 @@ const AdminPage = () => {
         <div className="card-body gap-4">
           <h2 className="card-title text-base">System Health</h2>
           <SystemHealth />
+        </div>
+      </section>
+
+      {/* Filter Configuration */}
+      <section className="card bg-base-100 shadow-sm border border-base-300">
+        <div className="card-body gap-4">
+          <div>
+            <h2 className="card-title text-base">Filter Configuration</h2>
+            <p className="text-sm opacity-60">Manage the keywords and codes used to filter SAM.gov and USASpending syncs. Changes take effect on the next sync run.</p>
+          </div>
+          <FilterConfig />
         </div>
       </section>
     </div>
