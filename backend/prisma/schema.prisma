@@ -314,6 +314,12 @@ model IndustryDay {
   @@index([status])
 }
 
+model AppConfig {
+  key       String   @id
+  values    String[]
+  updatedAt DateTime @updatedAt
+}
+
 model SyncLog {
   id              String     @id @default(cuid())
   jobId           String
