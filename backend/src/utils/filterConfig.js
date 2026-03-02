@@ -5,6 +5,18 @@ import {
   industryDayTitleKeywords,
 } from "./globals.js";
 
+// All valid AppConfig keys — active lists + word banks
+export const VALID_CONFIG_KEYS = [
+  "solicitationKeywords",
+  "naicsCodes",
+  "pscPrefixes",
+  "industryDayKeywords",
+  "solicitationKeywordsBank",
+  "naicsCodesBank",
+  "pscPrefixesBank",
+  "industryDayKeywordsBank",
+];
+
 // Seeds used on first deploy if AppConfig table is empty
 const SEEDS = {
   solicitationKeywords: solicitationTitleKeywords,

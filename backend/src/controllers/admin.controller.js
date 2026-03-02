@@ -2,7 +2,7 @@ import prisma from "../config/db.js";
 import { runCurrentOpportunitiesSyncFromSam, runIndustryDaySyncFromSam } from "./sam.controller.js";
 import { runAwardsSyncFromUsaspending } from "./usaspending.controller.js";
 import { runBackfillNullOpportunityDescriptionsFromSam } from "./db.controller.js";
-import { loadFilterConfig } from "../utils/filterConfig.js";
+import { loadFilterConfig, VALID_CONFIG_KEYS } from "../utils/filterConfig.js";
 
 // ─── SyncLog helper ──────────────────────────────────────────────────────────
 
@@ -227,17 +227,6 @@ export const triggerSync = async (req, res) => {
 };
 
 // ─── Filter Configuration ─────────────────────────────────────────────────────
-
-const VALID_CONFIG_KEYS = [
-  "solicitationKeywords",
-  "naicsCodes",
-  "pscPrefixes",
-  "industryDayKeywords",
-  "solicitationKeywordsBank",
-  "naicsCodesBank",
-  "pscPrefixesBank",
-  "industryDayKeywordsBank",
-];
 
 export const getFilterConfig = async (req, res) => {
   try {
