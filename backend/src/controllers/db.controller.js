@@ -331,7 +331,8 @@ export const listInboxItems = async (req, res) => {
     const { page, limit, skip } = parsePagination(req.query);
     const where = {};
     if (req.query.status) where.reviewStatus = req.query.status;
-
+    if (req.query.title) where.opportunity = { title: { contains: req.query.title, mode: "insensitive" } };
+    
     const [total, items] = await Promise.all([
       prisma.inboxItem.count({ where }),
       prisma.inboxItem.findMany({
@@ -604,6 +605,7 @@ export const listBuyingOrgs = async (req, res) => {
     const { page, limit, skip } = parsePagination(req.query);
     const where = {};
     if (req.query.level) where.level = req.query.level;
+    if (req.query.search) where.name = { contains: req.query.search, mode: "insensitive" };
 
     const [total, items] = await Promise.all([
       prisma.buyingOrganization.count({ where }),

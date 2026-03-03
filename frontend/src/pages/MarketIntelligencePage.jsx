@@ -57,6 +57,8 @@ const RecipientsTab = () => {
 const BuyingOrgsTab = () => {
   const [page, setPage] = useState(1);
   const [level, setLevel] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
 
   const handleLevelChange = (e) => {
     setLevel(e.target.value);
@@ -64,13 +66,18 @@ const BuyingOrgsTab = () => {
   };
 
   const { data: result, isLoading, isError, error } = useQuery({
-    queryKey: ["buying-orgs", page, level],
-    queryFn: () => dbApi.listBuyingOrgs({ page, limit: 50, level: level || undefined }),
+    queryKey: ["buying-orgs", page, level, debouncedSearch],
+    queryFn: () => dbApi.listBuyingOrgs({ page, limit: 50, level: level || undefined, search: debouncedSearch || undefined }),
   });
 
   return (
     <div className="flex flex-col gap-4">
+  
       <div className="flex items-center gap-2">
+            <SearchBar
+        placeholder="Search by name..."
+        onSearch={(val) => { setDebouncedSearch(val); setPage(1); }}
+      />
         <select
           className="select select-bordered"
           value={level}

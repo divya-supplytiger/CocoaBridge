@@ -5,6 +5,10 @@ const SearchBar = ({ onSearch, placeholder = "Search...", className = "" }) => {
   const [search, setSearch] = useState("");
   const timerRef = useRef(null);
 
+  // useCallback memoizes handleChange so it keeps the same function reference
+  // between renders. Without it, a new function is created every render, which
+  // can cause unnecessary re-renders in child components that receive it as a prop.
+  // It only recreates the function if `onSearch` (its dependency) changes.
   const handleChange = useCallback((e) => {
     const value = e.target.value;
     setSearch(value);

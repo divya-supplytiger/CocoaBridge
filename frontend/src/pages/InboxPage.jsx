@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { dbApi } from "../lib/api.js";
 import { useCurrentUser } from "../lib/CurrentUserContext.jsx";
 import Table from "../components/Table.jsx";
-
+import SearchBar from '../components/SearchBar.jsx';
 const STATUS_BADGE = {
   NEW: "badge-neutral",
   IN_REVIEW: "badge-warning",
@@ -20,13 +20,14 @@ const STATUSES = ["NEW", "IN_REVIEW", "QUALIFIED", "DISMISSED", "CONTACTED", "CL
 const InboxPage = () => {
   const [page, setPage] = useState(1);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const currentUser = useCurrentUser();
   const isAdmin = currentUser?.role === "ADMIN";
   const queryClient = useQueryClient();
 
   const { data: result, isLoading, isError, error } = useQuery({
-    queryKey: ["inboxItems", page],
+    queryKey: ["inboxItems", page, debouncedSearch],
     queryFn: () => dbApi.listInboxItems({ page, limit: 50 }),
   });
 
@@ -102,7 +103,12 @@ const InboxPage = () => {
   ];
 
   return (
-    <div>
+    <div className="flex flex-col gap-4">
+      <SearchBar
+        placeholder="Search by title..."
+        onSearch={(val) => { setDebouncedSearch(val); setPage(1); }}
+      />
+
       <Table
         columns={columns}
         data={result?.data ?? []}
