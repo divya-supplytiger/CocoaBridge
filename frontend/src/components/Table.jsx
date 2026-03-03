@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 import PaginationButton from './PaginationButton.jsx';
 import Row from "./Row.jsx";
 
-const Table = ({ isLoading, isError, error, data, columns, meta, page, onPageChange, basePath, emptyMessage, emptySubMessage }) => {
+const Table = ({ isLoading, isError, error, data, columns, meta, page, onPageChange, basePath, emptyMessage, emptySubMessage, sort, onSort }) => {
   const navigate = useNavigate();
   const totalPages = meta ? Math.ceil(meta.total / meta.limit) : 1;
   const showPagination = meta && meta.total > meta.limit;
@@ -31,7 +32,18 @@ const Table = ({ isLoading, isError, error, data, columns, meta, page, onPageCha
                 <thead>
                   <tr>
                     {columns.map((col) => (
-                      <th key={col.accessor}>{col.header}</th>
+                      <th
+                        key={col.accessor}
+                        onClick={col.sortable && onSort ? () => onSort(col.accessor) : undefined}
+                        className={col.sortable ? "cursor-pointer select-none hover:bg-base-200" : ""}
+                      >
+                        <span className="flex items-center gap-2">
+                          {col.header}
+                          {col.sortable && sort?.field === col.accessor && (
+                            sort.dir === "asc" ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />
+                          )}
+                        </span>
+                      </th>
                     ))}
                   </tr>
                 </thead>

@@ -5,10 +5,11 @@ import Table from "../components/Table.jsx";
 import SearchBar from "../components/SearchBar.jsx";
 
 const columns = [
-  { accessor: "title", header: "Title" },
+  { accessor: "title", header: "Title", sortable: true },
   {
     accessor: "pscCode",
     header: "PSC",
+    sortable: true,
     render: (val) => val ?? "—",
   },
   {
@@ -19,6 +20,7 @@ const columns = [
   {
     accessor: "responseDeadline",
     header: "Deadline",
+    sortable: true,
     render: (val) => (val ? new Date(val).toLocaleDateString() : "—"),
   },
   {
@@ -50,20 +52,31 @@ const columns = [
 const Opportunities = () => {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ search: "", naics: "", psc: "" });
+  const [sort, setSort] = useState({ field: null, dir: "asc" });
 
   const updateFilter = useCallback((key) => (value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
+    setSort({ field: null, dir: "asc" });
+    setPage(1);
+  }, []);
+
+  const handleSort = useCallback((field) => {
+    setSort((prev) => ({
+      field,
+      dir: prev.field === field && prev.dir === "asc" ? "desc" : "asc",
+    }));
     setPage(1);
   }, []);
 
   const { data: result, isLoading, isError, error } = useQuery({
-    queryKey: ["opportunities", page, filters],
+    queryKey: ["opportunities", page, filters, sort],
     queryFn: () => dbApi.listOpportunities({
       page,
       limit: 50,
       ...(filters.search && { search: filters.search }),
       ...(filters.naics && { naics: filters.naics }),
       ...(filters.psc && { psc: filters.psc }),
+      ...(sort.field && { sortBy: sort.field, sortDir: sort.dir }),
     }),
   });
 
@@ -84,6 +97,8 @@ const Opportunities = () => {
         page={page}
         onPageChange={setPage}
         basePath="/opportunities"
+        sort={sort}
+        onSort={handleSort}
       />
     </div>
   );

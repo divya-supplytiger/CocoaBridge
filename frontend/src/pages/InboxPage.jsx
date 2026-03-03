@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -21,14 +21,27 @@ const InboxPage = () => {
   const [page, setPage] = useState(1);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [sort, setSort] = useState({ field: null, dir: "asc" });
+
+  const handleSort = useCallback((field) => {
+    setSort((prev) => ({
+      field,
+      dir: prev.field === field && prev.dir === "asc" ? "desc" : "asc",
+    }));
+    setPage(1);
+  }, []);
 
   const currentUser = useCurrentUser();
   const isAdmin = currentUser?.role === "ADMIN";
   const queryClient = useQueryClient();
 
   const { data: result, isLoading, isError, error } = useQuery({
-    queryKey: ["inboxItems", page, debouncedSearch],
-    queryFn: () => dbApi.listInboxItems({ page, limit: 50 }),
+    queryKey: ["inboxItems", page, debouncedSearch, sort],
+    queryFn: () => dbApi.listInboxItems({
+      page,
+      limit: 50,
+      ...(sort.field && { sortBy: sort.field, sortDir: sort.dir }),
+    }),
   });
 
   const { mutate: updateStatus } = useMutation({
@@ -83,6 +96,7 @@ const InboxPage = () => {
     {
       accessor: "createdAt",
       header: "Created",
+      sortable: true,
       render: (val) => new Date(val).toLocaleDateString(),
     },
     ...(isAdmin ? [{
@@ -106,7 +120,7 @@ const InboxPage = () => {
     <div className="flex flex-col gap-4">
       <SearchBar
         placeholder="Search by title..."
-        onSearch={(val) => { setDebouncedSearch(val); setPage(1); }}
+        onSearch={(val) => { setDebouncedSearch(val); setSort({ field: null, dir: "asc" }); setPage(1); }}
       />
 
       <Table
@@ -119,6 +133,8 @@ const InboxPage = () => {
         page={page}
         onPageChange={setPage}
         basePath="/inbox"
+        sort={sort}
+        onSort={handleSort}
       />
 
       {pendingDeleteId && (

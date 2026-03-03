@@ -13,11 +13,13 @@ const columns = [
   {
     accessor: "obligatedAmount",
     header: "Amount",
+    sortable: true,
     render: (val) => val ? `$${Number(val).toLocaleString()}` : "—",
   },
   {
     accessor: "pscCode",
     header: "PSC",
+    sortable: true,
     render: (val) => val ?? "—",
   },
   {
@@ -28,11 +30,13 @@ const columns = [
   {
     accessor: "startDate",
     header: "Start",
+    sortable: true,
     render: (val) => val ? new Date(val).toLocaleDateString() : "—",
   },
   {
     accessor: "endDate",
     header: "End",
+    sortable: true,
     render: (val) => val ? new Date(val).toLocaleDateString() : "—",
   },
 ];
@@ -40,20 +44,31 @@ const columns = [
 const Awards = () => {
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ search: "", naics: "", psc: "" });
+  const [sort, setSort] = useState({ field: null, dir: "asc" });
 
   const updateFilter = useCallback((key) => (value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
+    setSort({ field: null, dir: "asc" });
+    setPage(1);
+  }, []);
+
+  const handleSort = useCallback((field) => {
+    setSort((prev) => ({
+      field,
+      dir: prev.field === field && prev.dir === "asc" ? "desc" : "asc",
+    }));
     setPage(1);
   }, []);
 
   const { data: result, isLoading, isError, error } = useQuery({
-    queryKey: ["awards", page, filters],
+    queryKey: ["awards", page, filters, sort],
     queryFn: () => dbApi.listAwards({
       page,
       limit: 50,
       ...(filters.search && { search: filters.search }),
       ...(filters.naics && { naics: filters.naics }),
       ...(filters.psc && { psc: filters.psc }),
+      ...(sort.field && { sortBy: sort.field, sortDir: sort.dir }),
     }),
   });
 
@@ -74,6 +89,8 @@ const Awards = () => {
         page={page}
         onPageChange={setPage}
         basePath="/awards"
+        sort={sort}
+        onSort={handleSort}
       />
     </div>
   );

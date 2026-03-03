@@ -332,13 +332,17 @@ export const listInboxItems = async (req, res) => {
     const where = {};
     if (req.query.status) where.reviewStatus = req.query.status;
     if (req.query.title) where.opportunity = { title: { contains: req.query.title, mode: "insensitive" } };
-    
+    const validInboxSortFields = ["createdAt"];
+    const inboxSortBy = validInboxSortFields.includes(req.query.sortBy) ? req.query.sortBy : null;
+    const inboxSortDir = req.query.sortDir === "asc" ? "asc" : "desc";
+    const inboxOrderBy = inboxSortBy ? { [inboxSortBy]: inboxSortDir } : { createdAt: "desc" };
+
     const [total, items] = await Promise.all([
       prisma.inboxItem.count({ where }),
       prisma.inboxItem.findMany({
         where,
         include: { opportunity: true, award: true, industryDay: true },
-        orderBy: { createdAt: "desc" },
+        orderBy: inboxOrderBy,
         skip,
         take: limit,
       }),
@@ -417,11 +421,16 @@ export const listOpportunities = async (req, res) => {
       ];
     }
 
+    const validOppSortFields = ["title", "responseDeadline", "pscCode"];
+    const oppSortBy = validOppSortFields.includes(req.query.sortBy) ? req.query.sortBy : null;
+    const oppSortDir = req.query.sortDir === "asc" ? "asc" : "desc";
+    const oppOrderBy = oppSortBy ? { [oppSortBy]: oppSortDir } : { postedDate: "desc" };
+
     const [total, items] = await Promise.all([
       prisma.opportunity.count({ where }),
       prisma.opportunity.findMany({
         where,
-        orderBy: { postedDate: "desc" },
+        orderBy: oppOrderBy,
         skip,
         take: limit,
       }),
@@ -494,11 +503,16 @@ export const listAwards = async (req, res) => {
     if (req.query.psc) where.pscCode = { startsWith: req.query.psc, mode: "insensitive" };
     if (req.query.search) where.description = { contains: req.query.search, mode: "insensitive" };
 
+    const validAwardSortFields = ["obligatedAmount", "startDate", "endDate", "pscCode"];
+    const awardSortBy = validAwardSortFields.includes(req.query.sortBy) ? req.query.sortBy : null; // get sort field from query if valid, else default to null
+    const awardSortDir = req.query.sortDir === "asc" ? "asc" : "desc";
+    const awardOrderBy = awardSortBy ? { [awardSortBy]: awardSortDir } : { startDate: "desc" };
+
     const [total, items] = await Promise.all([
       prisma.award.count({ where }),
       prisma.award.findMany({
         where,
-        orderBy: { startDate: "desc" },
+        orderBy: awardOrderBy,
         skip,
         take: limit,
       }),
@@ -607,12 +621,17 @@ export const listBuyingOrgs = async (req, res) => {
     if (req.query.level) where.level = req.query.level;
     if (req.query.search) where.name = { contains: req.query.search, mode: "insensitive" };
 
+    const validBuyingOrgSortFields = ["name"];
+    const buyingOrgSortBy = validBuyingOrgSortFields.includes(req.query.sortBy) ? req.query.sortBy : null;
+    const buyingOrgSortDir = req.query.sortDir === "asc" ? "asc" : "desc";
+    const buyingOrgOrderBy = buyingOrgSortBy ? { [buyingOrgSortBy]: buyingOrgSortDir } : { name: "asc" };
+
     const [total, items] = await Promise.all([
       prisma.buyingOrganization.count({ where }),
       prisma.buyingOrganization.findMany({
         where,
         include: { children: true },
-        orderBy: { name: "asc" },
+        orderBy: buyingOrgOrderBy,
         skip,
         take: limit,
       }),
@@ -672,11 +691,16 @@ export const listRecipients = async (req, res) => {
         { uei: { contains: req.query.search, mode: "insensitive" } },
       ];
     }
+    const validRecipientSortFields = ["name"];
+    const recipientSortBy = validRecipientSortFields.includes(req.query.sortBy) ? req.query.sortBy : null;
+    const recipientSortDir = req.query.sortDir === "asc" ? "asc" : "desc";
+    const recipientOrderBy = recipientSortBy ? { [recipientSortBy]: recipientSortDir } : { name: "asc" };
+
     const [total, items] = await Promise.all([
       prisma.recipient.count({ where }),
       prisma.recipient.findMany({
         where,
-        orderBy: { name: "asc" },
+        orderBy: recipientOrderBy,
         skip,
         take: limit,
       }),
@@ -731,11 +755,16 @@ export const listContacts = async (req, res) => {
         { email: { contains: req.query.search, mode: "insensitive" } },
       ];
     }
+    const validContactSortFields = ["fullName", "email", "title"];
+    const contactSortBy = validContactSortFields.includes(req.query.sortBy) ? req.query.sortBy : null;
+    const contactSortDir = req.query.sortDir === "asc" ? "asc" : "desc";
+    const contactOrderBy = contactSortBy ? { [contactSortBy]: contactSortDir } : { fullName: "asc" };
+
     const [total, items] = await Promise.all([
       prisma.contact.count({ where }),
       prisma.contact.findMany({
         where,
-        orderBy: { fullName: "asc" },
+        orderBy: contactOrderBy,
         skip,
         take: limit,
         include: {
