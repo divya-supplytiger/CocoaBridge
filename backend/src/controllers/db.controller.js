@@ -456,6 +456,9 @@ export const listOpportunities = async (req, res) => {
         { description: { contains: req.query.search, mode: "insensitive" } },
       ];
     }
+    if (req.query.favoritesOnly === "true") {
+      where.favorites = { some: { userId: req.user.id } };
+    }
 
     const validOppSortFields = ["title", "responseDeadline", "pscCode"];
     const oppSortBy = validOppSortFields.includes(req.query.sortBy) ? req.query.sortBy : null;
@@ -538,6 +541,9 @@ export const listAwards = async (req, res) => {
     if (req.query.naics) where.naicsCodes = { has: req.query.naics };
     if (req.query.psc) where.pscCode = { startsWith: req.query.psc, mode: "insensitive" };
     if (req.query.search) where.description = { contains: req.query.search, mode: "insensitive" };
+    if (req.query.favoritesOnly === "true") {
+      where.favorites = { some: { userId: req.user.id } };
+    }
 
     const validAwardSortFields = ["obligatedAmount", "startDate", "endDate", "pscCode"];
     const awardSortBy = validAwardSortFields.includes(req.query.sortBy) ? req.query.sortBy : null; // get sort field from query if valid, else default to null
@@ -853,6 +859,63 @@ export const updateContact = async (req, res) => {
   } catch (error) {
     if (error?.code === "P2025") return res.status(404).json({ error: "Contact not found" });
     console.error("updateContact error:", error);
+    return res.status(500).json({ error: "Internal server error", details: error.message });
+  }
+};
+
+// --- Favorite controllers ---
+
+export const listFavorites = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const [opportunities, awards] = await Promise.all([
+      prisma.opportunity.findMany({
+        where: { favorites: { some: { userId } } },
+        orderBy: { postedDate: "desc" },
+      }),
+      prisma.award.findMany({
+        where: { favorites: { some: { userId } } },
+        orderBy: { startDate: "desc" },
+      }),
+    ]);
+    return res.json({ opportunities, awards });
+  } catch (error) {
+    console.error("listFavorites error:", error);
+    return res.status(500).json({ error: "Internal server error", details: error.message });
+  }
+};
+
+export const toggleFavorite = async (req, res) => {
+  try {
+    const { entityType, entityId } = req.body;
+    if (!entityType || !entityId) {
+      return res.status(400).json({ error: "entityType and entityId are required" });
+    }
+    if (!["opportunity", "award"].includes(entityType)) {
+      return res.status(400).json({ error: "entityType must be 'opportunity' or 'award'" });
+    }
+
+    const userId = req.user.id;
+    const where = entityType === "opportunity"
+      ? { userId, opportunityId: entityId }
+      : { userId, awardId: entityId };
+
+    const existing = await prisma.favorite.findFirst({ where });
+    if (existing) {
+      await prisma.favorite.delete({ where: { id: existing.id } });
+      return res.json({ favorited: false });
+    }
+
+    await prisma.favorite.create({
+      data: {
+        userId,
+        opportunityId: entityType === "opportunity" ? entityId : null,
+        awardId: entityType === "award" ? entityId : null,
+      },
+    });
+    return res.status(201).json({ favorited: true });
+  } catch (error) {
+    console.error("toggleFavorite error:", error);
     return res.status(500).json({ error: "Internal server error", details: error.message });
   }
 };

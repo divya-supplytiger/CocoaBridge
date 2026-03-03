@@ -101,6 +101,15 @@ export const dbApi = {
     const { data } = await axiosInstance.patch(`/db/contacts/${id}`, body);
     return data;
   },
+  // Favorites
+  listFavorites: async () => {
+    const { data } = await axiosInstance.get("/db/favorites");
+    return data;
+  },
+  toggleFavorite: async (entityType, entityId) => {
+    const { data } = await axiosInstance.post("/db/favorites", { entityType, entityId });
+    return data;
+  },
 };
 
 export const adminApi = {

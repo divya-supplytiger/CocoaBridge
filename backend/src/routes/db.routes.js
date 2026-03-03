@@ -24,6 +24,8 @@ import {
   listContacts,
   getContact,
   updateContact,
+  listFavorites,
+  toggleFavorite,
 } from "../controllers/db.controller.js";
 
 export const router = express.Router();
@@ -71,3 +73,7 @@ router.patch("/recipients/:id", ...protectRoute, adminOnly, updateRecipient);
 router.get("/contacts", ...protectRoute, readOnlyOrAbove, listContacts);
 router.get("/contacts/:id", ...protectRoute, readOnlyOrAbove, getContact);
 router.patch("/contacts/:id", ...protectRoute, adminOnly, updateContact);
+
+// Favorites
+router.get("/favorites", ...protectRoute, readOnlyOrAbove, listFavorites);
+router.post("/favorites", ...protectRoute, readOnlyOrAbove, toggleFavorite);

@@ -89,6 +89,8 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  favorites Favorite[]
 }
 
 model Contact {
@@ -230,6 +232,8 @@ model Opportunity {
   // Contacts scraped from SAM for this opportunity (optional but useful)
   contactLinks ContactLink[]
 
+  favorites Favorite[]
+
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   industryDay IndustryDay?
@@ -269,6 +273,8 @@ model Award {
   recipient   Recipient? @relation(fields: [recipientId], references: [id], onDelete: SetNull)
 
   inboxItems InboxItem[]
+
+  favorites Favorite[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -378,4 +384,19 @@ model InboxItem {
   @@index([awardId])
   @@index([opportunityId])
   @@index([industryDayId])
+}
+
+model Favorite {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  awardId       String?
+  award         Award?       @relation(fields: [awardId], references: [id], onDelete: Cascade)
+  createdAt     DateTime     @default(now())
+
+  @@unique([userId, opportunityId])
+  @@unique([userId, awardId])
+  @@index([userId])
 }
