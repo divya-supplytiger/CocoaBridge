@@ -151,7 +151,7 @@ const InboxItemDetail = () => {
             <h3 className="font-bold text-lg">Delete Inbox Item</h3>
             <p className="py-4">Are you sure you want to delete this inbox item? This cannot be undone.</p>
             <div className="modal-action">
-              <button className="btn btn-ghost" onClick={() => setShowDeleteConfirm(false)}>
+              <button className="btn btn-accent" onClick={() => setShowDeleteConfirm(false)}>
                 Cancel
               </button>
               <button
@@ -164,7 +164,7 @@ const InboxItemDetail = () => {
             </div>
           </div>
           <form method="dialog" className="modal-backdrop">
-            <button onClick={() => setShowDeleteConfirm(false)}>close</button>
+            <button className="btn btn-accent" onClick={() => setShowDeleteConfirm(false)}>close</button>
           </form>
         </dialog>
       )}

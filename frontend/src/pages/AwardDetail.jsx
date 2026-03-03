@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+import { Trash2, Inbox } from "lucide-react";
 import toast from "react-hot-toast";
 import { dbApi } from "../lib/api.js";
 import { useCurrentUser } from "../lib/CurrentUserContext.jsx";
 import ItemDetail from "../components/ItemDetail.jsx";
+import AddToInboxModal from "../components/AddToInboxModal.jsx";
 
 const AwardDetail = () => {
   const { id } = useParams();
@@ -15,6 +16,7 @@ const AwardDetail = () => {
   const queryClient = useQueryClient();
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showAddToInbox, setShowAddToInbox] = useState(false);
 
   const { data: result, isLoading, isError, error } = useQuery({
     queryKey: ["award", id],
@@ -24,7 +26,7 @@ const AwardDetail = () => {
   const item = result?.data;
 
   const awardLink = `https://www.usaspending.gov/award/${item?.externalId}`;
-  
+
   const { mutate: deleteItem, isPending: isDeleting } = useMutation({
     mutationFn: () => dbApi.deleteAward(id),
     onSuccess: () => {
@@ -83,7 +85,24 @@ const AwardDetail = () => {
         fields={fields}
       >
         {isAdmin && item && (
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            {item.inboxItems?.length > 0 ? (
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => navigate(`/inbox/${item.inboxItems[0].id}`)}
+              >
+                <Inbox className="size-4" />
+                View in Inbox
+              </button>
+            ) : (
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => setShowAddToInbox(true)}
+              >
+                <Inbox className="size-4" />
+                Add to Inbox
+              </button>
+            )}
             <button
               className="btn btn-error btn-sm"
               onClick={() => setShowDeleteConfirm(true)}
@@ -101,7 +120,7 @@ const AwardDetail = () => {
             <h3 className="font-bold text-lg">Delete Award</h3>
             <p className="py-4">Are you sure you want to delete this award? This cannot be undone.</p>
             <div className="modal-action">
-              <button className="btn btn-ghost" onClick={() => setShowDeleteConfirm(false)}>
+              <button className="btn btn-accent" onClick={() => setShowDeleteConfirm(false)}>
                 Cancel
               </button>
               <button
@@ -114,9 +133,17 @@ const AwardDetail = () => {
             </div>
           </div>
           <form method="dialog" className="modal-backdrop">
-            <button onClick={() => setShowDeleteConfirm(false)}>close</button>
+            <button className="btn btn-accent" onClick={() => setShowDeleteConfirm(false)}>close</button>
           </form>
         </dialog>
+      )}
+
+      {showAddToInbox && (
+        <AddToInboxModal
+          awardId={id}
+          defaultType="AWARD_NOTICE"
+          onClose={() => setShowAddToInbox(false)}
+        />
       )}
     </>
   );
