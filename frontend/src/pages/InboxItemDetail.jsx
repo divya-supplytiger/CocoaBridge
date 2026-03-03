@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate, Link } from 'react-router';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+import { Trash2, Trophy, Handshake } from "lucide-react";
 import toast from "react-hot-toast";
 import { dbApi } from "../lib/api.js";
 import { useCurrentUser } from "../lib/CurrentUserContext.jsx";
 import ItemDetail from "../components/ItemDetail.jsx";
-import RelatedRecordsCard from "../components/RelatedRecordsCard.jsx";
 
 const STATUS_BADGE = {
   NEW: "badge-neutral",
@@ -105,20 +104,34 @@ const InboxItemDetail = () => {
                   ))}
                 </select>
               </div>
-              <button
-                className="btn btn-error btn-sm ml-auto"
-                onClick={() => setShowDeleteConfirm(true)}
-              >
-                <Trash2 className="size-4" />
-                Delete
-              </button>
+              <div className="flex gap-2 ml-auto">
+                {item.opportunity && (
+                  <Link to={`/opportunities/${item.opportunity.id}`} className="btn btn-primary btn-sm">
+                    <Handshake className="size-4" />
+                    View Opportunity
+                  </Link>
+                )}
+                {item.award && (
+                  <Link to={`/awards/${item.award.id}`} className="btn btn-primary btn-sm">
+                    <Trophy className="size-4" />
+                    View Award
+                  </Link>
+                )}
+                <button
+                  className="btn btn-error btn-sm"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  <Trash2 className="size-4" />
+                  Delete
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-col gap-1">
               <p className="font-semibold text-sm">Notes</p>
               <textarea
                 className="textarea textarea-bordered text-sm w-full"
-                rows={3}
+                rows={6}
                 value={notesValue}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Add notes…"
@@ -140,10 +153,7 @@ const InboxItemDetail = () => {
             <p className="text-sm text-base-content/80">{item.notes}</p>
           </div>
         )}
-
       </ItemDetail>
-      <RelatedRecordsCard opportunity={item?.opportunity} award={item?.award} />
-
 
       {showDeleteConfirm && (
         <dialog open className="modal modal-open">
