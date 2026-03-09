@@ -49,7 +49,7 @@ const SectionShell = ({ title, subtitle, children }) => (
   </section>
 );
 
-const Table = ({ columns, data, keyField = "id" }) => (
+const AnalyticsTable = ({ columns, data, keyField = "id" }) => (
   <div className="overflow-x-auto">
     <table className="table table-sm w-full">
       <thead>
@@ -120,10 +120,10 @@ const RecipientAnalytics = () => {
     { accessor: "uei", header: "UEI", cellClassName: "text-xs opacity-60", render: (val) => val ?? "—" },
     { accessor: "awardCount", header: "Awards", className: "text-right", cellClassName: "text-right text-sm", render: (val) => val.toLocaleString() },
     { accessor: "totalObligated", header: "Total Obligated", className: "text-right", cellClassName: "text-right text-sm font-medium", render: (val) => fmt(val) },
-    { accessor: "totalObligated", header: "", render: (val) => <Bar value={val} max={max} />, cellClassName: "w-24" },
+    { accessor: "_bar", header: "", render: (_, row) => <Bar value={row.totalObligated} max={max} />, cellClassName: "w-24" },
   ];
 
-  return <Table columns={columns} data={rows} />;
+  return <AnalyticsTable columns={columns} data={rows} />;
 };
 
 // ─── Section 2 & 3: PSC / NAICS ──────────────────────────────────────────────
@@ -147,7 +147,7 @@ const CodeAnalytics = ({ queryKey, queryFn, codeLabel }) => {
     { accessor: "oppCount", header: "Opps", className: "text-right", cellClassName: "text-right text-sm", render: (val) => val.toLocaleString() },
     { accessor: "awardCount", header: "Awards", className: "text-right", cellClassName: "text-right text-sm", render: (val) => val.toLocaleString() },
     { accessor: "totalObligated", header: "Total Obligated", className: "text-right", cellClassName: "text-right text-sm font-medium", render: (val) => fmt(val) },
-    { accessor: "totalObligated", header: "", cellClassName: "w-24", render: (val) => <Bar value={val} max={max} /> },
+    { accessor: "_bar", header: "", cellClassName: "w-24", render: (_, row) => <Bar value={row.totalObligated} max={max} /> },
   ];
 
   const tableData = rows.map((r, i) => ({ ...r, id: r.pscCode ?? r.naics, code: r.pscCode ?? r.naics, rank: i + 1 }));
@@ -168,7 +168,7 @@ const CodeAnalytics = ({ queryKey, queryFn, codeLabel }) => {
           </button>
         ))}
       </div>
-      <Table columns={columns} data={tableData} />
+      <AnalyticsTable columns={columns} data={tableData} />
     </>
   );
 };
@@ -225,8 +225,7 @@ const AgencyAnalytics = () => {
     <>
       <div className="join">
         {[
-                    { key: "awardTotal", label: "By Award $" },
-
+          { key: "awardTotal", label: "By Award $" },
           { key: "oppCount", label: "By Opp Count" },
         ].map(({ key, label }) => (
           <button
@@ -238,7 +237,7 @@ const AgencyAnalytics = () => {
           </button>
         ))}
       </div>
-      <Table columns={columns} data={tableData} />
+      <AnalyticsTable columns={columns} data={tableData} />
     </>
   );
 };

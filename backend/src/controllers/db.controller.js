@@ -900,11 +900,10 @@ export const toggleFavorite = async (req, res) => {
       ? { userId, opportunityId: entityId }
       : { userId, awardId: entityId };
 
-    const existing = await prisma.favorite.findFirst({ where });
-    if (existing) {
-      await prisma.favorite.delete({ where: { id: existing.id } });
-      return res.json({ favorited: false });
-    }
+      const {count} = await prisma.favorite.deleteMany({ where });
+      if( count > 0) {
+        return res.status(200).json({ favorited: false });
+      }
 
     await prisma.favorite.create({
       data: {

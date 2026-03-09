@@ -9,20 +9,18 @@ export const getRecipientAnalytics = async (req, res) => {
       _sum: { obligatedAmount: true },
       _count: { id: true },
       where: { recipientId: { not: null } },
+      orderBy: { _sum: { obligatedAmount: "desc" } },
+      take: 50,
     });
 
-    const top = grouped
-      .sort((a, b) => Number(b._sum.obligatedAmount ?? 0) - Number(a._sum.obligatedAmount ?? 0))
-      .slice(0, 50);
-
-    const recipientIds = top.map((r) => r.recipientId);
+    const recipientIds = grouped.map((r) => r.recipientId);
     const recipients = await prisma.recipient.findMany({
       where: { id: { in: recipientIds } },
       select: { id: true, name: true, uei: true },
     });
     const byId = Object.fromEntries(recipients.map((r) => [r.id, r]));
 
-    const data = top.map((row) => ({
+    const data = grouped.map((row) => ({
       recipientId: row.recipientId,
       name: byId[row.recipientId]?.name ?? "Unknown",
       uei: byId[row.recipientId]?.uei ?? null,
@@ -30,7 +28,7 @@ export const getRecipientAnalytics = async (req, res) => {
       totalObligated: Number(row._sum.obligatedAmount ?? 0),
     }));
 
-    return res.json({ data });
+    return res.status(200).json({ data });
   } catch (error) {
     console.error("Error in getRecipientAnalytics:", error);
     return res.status(500).json({ message: "Internal server error" });
@@ -68,7 +66,7 @@ export const getPscAnalytics = async (req, res) => {
 
     const data = Object.values(map).sort((a, b) => b.totalObligated - a.totalObligated);
 
-    return res.json({ data });
+    return res.status(200).json({ data });
   } catch (error) {
     console.error("Error in getPscAnalytics:", error);
     return res.status(500).json({ message: "Internal server error" });
@@ -86,7 +84,6 @@ export const getNaicsAnalytics = async (req, res) => {
         WHERE array_length("naicsCodes", 1) > 0
         GROUP BY naics
         ORDER BY opp_count DESC
-        LIMIT 100
       `,
       prisma.$queryRaw`
         SELECT unnest("naicsCodes") AS naics,
@@ -96,7 +93,6 @@ export const getNaicsAnalytics = async (req, res) => {
         WHERE array_length("naicsCodes", 1) > 0
         GROUP BY naics
         ORDER BY total_obligated DESC
-        LIMIT 100
       `,
     ]);
 
@@ -112,7 +108,7 @@ export const getNaicsAnalytics = async (req, res) => {
 
     const data = Object.values(map).sort((a, b) => b.totalObligated - a.totalObligated);
 
-    return res.json({ data });
+    return res.status(200).json({ data });
   } catch (error) {
     console.error("Error in getNaicsAnalytics:", error);
     return res.status(500).json({ message: "Internal server error" });
@@ -121,7 +117,7 @@ export const getNaicsAnalytics = async (req, res) => {
 
 // ─── Agency breakdown ─────────────────────────────────────────────────────────
 
-export const getAgencyAnalytics = async (req, res) => {
+export const getAgencyAnalytics = async (_req, res) => {
   try {
     const [oppGroups, awardGroups] = await Promise.all([
       prisma.opportunity.groupBy({
@@ -137,7 +133,6 @@ export const getAgencyAnalytics = async (req, res) => {
       }),
     ]);
 
-    // Collect all org IDs
     const orgIds = [
       ...new Set([
         ...oppGroups.map((r) => r.buyingOrganizationId),
@@ -151,10 +146,9 @@ export const getAgencyAnalytics = async (req, res) => {
     });
     const orgById = Object.fromEntries(orgs.map((o) => [o.id, o]));
 
-    // Build per-org map
     const map = {};
-    for (const row of oppGroups) {
-      const id = row.buyingOrganizationId;
+
+    const ensureEntry = (id) => {
       if (!map[id]) {
         map[id] = {
           orgId: id,
@@ -166,31 +160,26 @@ export const getAgencyAnalytics = async (req, res) => {
           awardTotal: 0,
         };
       }
+    };
+
+    for (const row of oppGroups) {
+      const id = row.buyingOrganizationId;
+      ensureEntry(id);
       map[id].oppCount += row._count.id;
       map[id].oppsByType[row.type] = (map[id].oppsByType[row.type] ?? 0) + row._count.id;
     }
     for (const row of awardGroups) {
       const id = row.buyingOrganizationId;
-      if (!map[id]) {
-        map[id] = {
-          orgId: id,
-          name: orgById[id]?.name ?? "Unknown",
-          level: orgById[id]?.level ?? null,
-          oppCount: 0,
-          oppsByType: {},
-          awardCount: 0,
-          awardTotal: 0,
-        };
-      }
+      ensureEntry(id);
       map[id].awardCount = row._count.id;
       map[id].awardTotal = Number(row._sum.obligatedAmount ?? 0);
     }
 
     const data = Object.values(map)
-      .sort((a, b) => (b.oppCount + b.awardCount) - (a.oppCount + a.awardCount))
+      .sort((a, b) => b.awardTotal - a.awardTotal)
       .slice(0, 50);
 
-    return res.json({ data });
+    return res.status(200).json({ data });
   } catch (error) {
     console.error("Error in getAgencyAnalytics:", error);
     return res.status(500).json({ message: "Internal server error" });
