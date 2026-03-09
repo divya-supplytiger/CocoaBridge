@@ -49,6 +49,7 @@ function App() {
     <Routes>
       <Route path="/login" element={isSignedIn ? <Navigate to="/dashboard" /> : <LoginPage />} />
       <Route path="/" element={isSignedIn ? <DashboardLayout /> : <Navigate to="/login" />}>
+        <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="inbox" element={<DataOnlyRoute><InboxPage /></DataOnlyRoute>} />
         <Route path="inbox/:id" element={<DataOnlyRoute><InboxItemDetail /></DataOnlyRoute>} />

@@ -872,10 +872,12 @@ export const listFavorites = async (req, res) => {
       prisma.opportunity.findMany({
         where: { favorites: { some: { userId } } },
         orderBy: { postedDate: "desc" },
+        select: { id: true, title: true, pscCode: true, naicsCodes: true, responseDeadline: true, type: true, active: true },
       }),
       prisma.award.findMany({
         where: { favorites: { some: { userId } } },
         orderBy: { startDate: "desc" },
+        select: { id: true, description: true, obligatedAmount: true, pscCode: true, naicsCodes: true, startDate: true, endDate: true },
       }),
     ]);
     return res.json({ opportunities, awards });
