@@ -1,5 +1,5 @@
 {
-  "name": "supplytigergoa",
+  "name": "CocoaBridge",
   "version": "1.0.0",
   "description": "This project supports **SupplyTiger's execution-focused expansion into U.S. Federal Government sales**, with a primary emphasis on **micro-purchases, open-market buys, and subcontracting**.",
   "main": "index.js",
@@ -9,13 +9,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/divya-supplytiger/SupplyTigerGOA.git"
+    "url": "git+https://github.com/divya-supplytiger/CocoaBridge.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/divya-supplytiger/SupplyTigerGOA/issues"
+    "url": "https://github.com/divya-supplytiger/CocoaBridge/issues"
   },
-  "homepage": "https://github.com/divya-supplytiger/SupplyTigerGOA#readme"
+  "homepage": "https://github.com/divya-supplytiger/CocoaBridge#readme"
 }

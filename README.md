@@ -1,4 +1,4 @@
-# SupplyTiger – Government Outreach Automation (SupplyTigerGOA)
+# SupplyTiger – CocoaBridge
 
 ## Overview
 
@@ -43,7 +43,7 @@ The system is designed to:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/divya-supplytiger/SupplyTigerGOA.git
+git clone https://github.com/divya-supplytiger/CocoaBridge.git
 cd SupplyTigerGOA
 ```
 

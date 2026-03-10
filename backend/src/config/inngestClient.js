@@ -3,7 +3,7 @@ import { ENV } from "./env.js";
 
 // Shared Inngest client used by both emitters and function handlers.
 export const inngestClient = new Inngest({
-  name: "SupplyTigerGOA Inngest Client",
+  name: "CocoaBridge Inngest Client",
   id: ENV.INNGEST_ID,
 });
 
