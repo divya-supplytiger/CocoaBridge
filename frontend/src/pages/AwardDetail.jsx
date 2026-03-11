@@ -117,7 +117,7 @@ const AwardDetail = () => {
                 ))}
                 {isAdmin && (
                   <button
-                    className="btn btn-error btn-sm"
+                    className="btn btn-error btn-sm text-white"
                     onClick={() => setShowDeleteConfirm(true)}
                   >
                     <Trash2 className="size-4" />

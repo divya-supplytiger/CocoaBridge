@@ -1,7 +1,7 @@
 import {useUser} from "@clerk/clerk-react";
 import {useState, useRef} from "react";
 import {Link, useLocation, useNavigate} from "react-router";
-import {Search} from "lucide-react";
+import {Search, Layers} from "lucide-react";
 import {NAVIGATION_LINKS} from "./NavigationLinks.jsx";
 import {useCurrentUser} from "../lib/CurrentUserContext.jsx";
 
@@ -63,31 +63,27 @@ const Sidebar = () => {
             <div className="flex min-h-full flex-col bg-base-100 text-accent-content is-drawer-close:w-14 is-drawer-open:w-64 transition-all duration-200">
 
                 {/* sidebar header */}
-                <div className="p-4 is-drawer-close:px-2 w-full bg-primary">
+                <div className="p-3 is-drawer-close:px-2 w-full bg-primary">
                     <div className="flex items-center gap-3 is-drawer-close:justify-center">
-                        <img
-                            src="st-icon-logo.jpg"
-                            alt="SupplyTiger Logo"
-                            className="size-10 rounded-xl flex items-center justify-center shrink-0"
-                        />
-                        <span className="text-3xl harletitle is-drawer-close:hidden text-secondary-content">SupplyTiger</span>
+                        <img src="/cocoaBridgeLogoBeanOnly.svg" className="size-10 opacity-90 is-drawer-open:hidden" />
+                        <img src="/cocoaBridgeNameWhiteWithLogo.svg" className="flex-1 size-10 opacity-90 is-drawer-close:hidden" />
                     </div>
                 </div>
 
                 {/* page search — icon only when drawer closed, full bar when open */}
-                <div className="is-drawer-open:hidden flex justify-center mt-2 tooltip tooltip-right" data-tip="Search">
-                    <button onClick={onSearchIconClick} className="p-2 rounded-lg hover:bg-secondary-content/10 text-secondary-content">
+                <div className="is-drawer-open:hidden flex justify-center mt-2 tooltip tooltip-right text-primary-content" data-tip="Search">
+                    <button onClick={onSearchIconClick} className="p-2 rounded-lg hover:bg-secondary-content/10">
                         <Search className="size-4" />
                     </button>
                 </div>
 
                 <div className="is-drawer-close:hidden relative mx-2 mt-2">
-                    <div className="flex items-center gap-2 input input-sm bg-accent-content/10 border-secondary-content/40 text-accent-content w-full">
+                    <div className="flex items-center gap-2 input input-sm bg-accent-content/10 border-secondary-content/40 w-full">
                         <Search className="size-4 opacity-60 shrink-0" />
                         <input
                             ref={searchInputRef}
                             type="text"
-                            className="bg-transparent outline-none placeholder:text-secondary-content/50 text-secondary-content w-full text-sm"
+                            className="bg-transparent outline-none placeholder:text-accent-secondary text-accent-content w-full text-sm"
                             placeholder="Go to page…"
                             value={query}
                             onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
@@ -181,7 +177,7 @@ const Sidebar = () => {
                 )}
 
                 {/* user info */}
-                <div className="p-4 w-full border-t border-base-300 bg-primary text-primary-content">
+                <div className="p-3 w-full border-t border-base-300 bg-primary text-primary-content">
                     <div className="flex items-center gap-3 is-drawer-close:justify-center">
                         <div className="avatar shrink-0">
                             <img

@@ -91,7 +91,7 @@ const BuyingOrgDetail = () => {
                   to={`/buying-orgs/${parent.id}`}
                   className="flex items-center gap-2 link link-hover"
                 >
-                  <span className="badge badge-accent badge-sm">{parent.level}</span>
+                  <span className="badge badge-accent badge-sm text-secondary-content">{parent.level}</span>
                   {parent.name}
                 </Link>
               </div>
@@ -106,7 +106,7 @@ const BuyingOrgDetail = () => {
                         to={`/buying-orgs/${c.id}`}
                         className="flex items-center gap-2 link link-hover"
                       >
-                        <span className="badge badge-outline badge-sm">{c.level}</span>
+                        <span className="badge badge-outline badge-sm text-primary-content">{c.level}</span>
                         {c.name}
                       </Link>
                     </li>

@@ -28,14 +28,14 @@ const ItemDetail = ({
       ) : isError ? (
         <div className="alert alert-error">{error?.message ?? "Failed to load"}</div>
       ) : item ? (
-        <div className="card bg-white text-primary-content shadow-md">
+        <div className="card bg-base-100 text-accent-content shadow-md">
           <div className="card-body gap-3">
             <h2 className="card-title">{title}</h2>
             {badges && (
               <div className="flex gap-2 flex-wrap">{badges}</div>
             )}
             {description && (
-              <p className="text-primary-content/80 text-sm">{description}</p>
+              <p className="text-accent-content/80 text-sm">{description}</p>
             )}
             {children}
             <div className="divider my-1" />

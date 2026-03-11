@@ -9,7 +9,7 @@ const Table = ({ isLoading, isError, error, data, columns, meta, page, onPageCha
   const showPagination = meta && meta.total > meta.limit;
 
   return (
-    <div className="card bg-base-100 text-primary-content shadow-md">
+    <div className="card bg-base-100 text-accent-content shadow-md">
       <div className="card-body">
         {isLoading ? (
           <div className="flex justify-center py-12">

@@ -3,6 +3,59 @@
   themes: luxury, cupcake, valentine, retro;
 }
 
+@plugin "daisyui/theme" {
+  name: "cocoaconfection";
+  default: false;
+  prefersdark: false;
+  color-scheme: "light";
+  --color-base-100: oklch(0.96 0.02 80);
+  --color-base-200: oklch(0.92 0.02 80);
+  --color-base-300: oklch(0.88 0.02 80);
+  --color-base-content: oklch(0.28 0.02 35);
+
+  --color-primary: oklch(0.55 0.10 55);
+  --color-primary-content: oklch(0.97 0.01 90);
+
+  --color-secondary: oklch(0.36 0.07 35);
+
+  --color-secondary-content: oklch(0.98 0.01 90);
+
+  --color-accent: oklch(0.60 0.11 145);
+  --color-accent-content: oklch(0.36 0.07 35);
+
+  --color-neutral: oklch(0.28 0.02 35);
+  --color-neutral-content: oklch(0.95 0.01 90);
+
+  --color-info: oklch(0.65 0.15 240);
+  --color-info-content: oklch(29% 0.066 243.157);
+
+  --color-success: oklch(0.68 0.16 145);
+  --color-success-content: oklch(26% 0.051 172.552);
+
+  --color-warning: oklch(0.78 0.18 80);
+  --color-warning-content: oklch(28% 0.066 53.813);
+
+  --color-error: oklch(0.63 0.20 25);
+  --color-error-content: oklch(27% 0.105 12.094);
+
+  --pistachio: oklch(0.73 0.09 146);
+  --cocoa: oklch(0.33 0.05 35);
+  --strawberry: oklch(0.62 0.19 20);
+  --vanilla: oklch(0.96 0.02 85);
+
+  --radius-selector: 0.25rem;
+  --radius-field: 0.5rem;
+
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+
+  --size-field: 0.25rem;
+  --border: 2px;
+  --depth: 1;
+  --noise: 0;
+}
+
+
 @font-face {
   font-family: 'Harlekin';
   src: url('/fonts/Harlekin.otf') format('opentype');
@@ -11,6 +64,22 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'Scripter';
+  src: url('/fonts/Scripter-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+img.favicon {
+  border-radius: 12px;
+}
+
 .harletitle {
   font-family: 'Harlekin', cursive;
+}
+
+.scripter {
+  font-family: 'Scripter', cursive;
 }

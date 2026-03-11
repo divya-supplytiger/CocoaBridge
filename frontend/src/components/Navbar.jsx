@@ -15,7 +15,7 @@ const Navbar = () => {
 
             {/* dynamic title */}
             <div className="flex-1 px-4">
-                <h1 className="text-2xl font-bold">
+                <h1 className="text-2xl scripter">
                     {NAVIGATION_LINKS.find((item) => item.path === location.pathname)?.name || "Dashboard"}
                 </h1>
             </div>
