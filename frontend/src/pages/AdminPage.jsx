@@ -6,7 +6,7 @@ import { adminApi } from "../lib/api.js";
 import { useCurrentUser } from "../lib/CurrentUserContext.jsx";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
+// Testing
 const ROLES = ["USER", "READ_ONLY", "ADMIN"];
 
 const ROLE_LABELS = {
