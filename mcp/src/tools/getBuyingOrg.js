@@ -2,10 +2,19 @@ import { z } from "zod";
 import prisma from "../db.js";
 
 export function registerGetBuyingOrg(server) {
-  server.tool(
+  server.registerTool(
     "get_buying_org",
-    "Get full details of a buying organization including parent, children, and opportunity/award counts",
-    { id: z.string().describe("BuyingOrganization ID") },
+    {
+      title: "Get Buying Organization",
+      description: "Get full details of a buying organization including parent, children, and opportunity/award counts",
+      inputSchema: { id: z.string().describe("BuyingOrganization ID") },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
     async ({ id }) => {
       try {
         const org = await prisma.buyingOrganization.findUnique({

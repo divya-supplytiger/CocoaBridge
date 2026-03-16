@@ -1,19 +1,29 @@
+import { z } from "zod";
 import prisma from "../db.js";
 
 export function registerSearchAwards(server) {
-  server.tool(
+  server.registerTool(
     "search_awards",
-    "Search federal contract awards by keyword, NAICS, PSC, recipient, buying org, or amount range",
     {
-      keyword: { type: "string", description: "Searches description (case-insensitive contains)" },
-      naics: { type: "string", description: "Match against naicsCodes array" },
-      psc: { type: "string", description: "Match pscCode" },
-      recipientId: { type: "string", description: "Filter by recipient ID" },
-      buyingOrgId: { type: "string", description: "Filter by buying organization ID" },
-      minAmount: { type: "number", description: "Minimum obligatedAmount" },
-      maxAmount: { type: "number", description: "Maximum obligatedAmount" },
-      limit: { type: "number", description: "Max results (default 20, max 50)" },
-      offset: { type: "number", description: "Number of results to skip for pagination (default 0)" },
+      title: "Search Awards",
+      description: "Search federal contract awards by keyword, NAICS, PSC, recipient, buying org, or amount range",
+      inputSchema: {
+        keyword: z.string().optional().describe("Searches description (case-insensitive contains)"),
+        naics: z.string().optional().describe("Match against naicsCodes array"),
+        psc: z.string().optional().describe("Match pscCode"),
+        recipientId: z.string().optional().describe("Filter by recipient ID"),
+        buyingOrgId: z.string().optional().describe("Filter by buying organization ID"),
+        minAmount: z.number().optional().describe("Minimum obligatedAmount"),
+        maxAmount: z.number().optional().describe("Maximum obligatedAmount"),
+        limit: z.number().optional().describe("Max results (default 20, max 50)"),
+        offset: z.number().optional().describe("Number of results to skip for pagination (default 0)"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ keyword, naics, psc, recipientId, buyingOrgId, minAmount, maxAmount, limit: rawLimit, offset: rawOffset }) => {
       try {

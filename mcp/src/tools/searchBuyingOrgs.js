@@ -1,18 +1,24 @@
+import { z } from "zod";
 import prisma from "../db.js";
 
 export function registerSearchBuyingOrgs(server) {
-  server.tool(
+  server.registerTool(
     "search_buying_orgs",
-    "Search government buying organizations by name or hierarchy level",
     {
-      name: { type: "string", description: "Case-insensitive contains match on name" },
-      level: {
-        type: "string",
-        description: "Organization level",
-        enum: ["AGENCY", "SUBAGENCY", "OFFICE", "OTHER"],
+      title: "Search Buying Organizations",
+      description: "Search government buying organizations by name or hierarchy level",
+      inputSchema: {
+        name: z.string().optional().describe("Case-insensitive contains match on name"),
+        level: z.enum(["AGENCY", "SUBAGENCY", "OFFICE", "OTHER"]).optional().describe("Organization level"),
+        limit: z.number().optional().describe("Max results (default 20, max 50)"),
+        offset: z.number().optional().describe("Number of results to skip for pagination (default 0)"),
       },
-      limit: { type: "number", description: "Max results (default 20, max 50)" },
-      offset: { type: "number", description: "Number of results to skip for pagination (default 0)" },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ name, level, limit: rawLimit, offset: rawOffset }) => {
       try {

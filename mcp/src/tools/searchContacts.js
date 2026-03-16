@@ -1,15 +1,25 @@
+import { z } from "zod";
 import prisma from "../db.js";
 
 export function registerSearchContacts(server) {
-  server.tool(
+  server.registerTool(
     "search_contacts",
-    "Find contacts linked to opportunities, buying organizations, or industry days",
     {
-      keyword: { type: "string", description: "Searches linked opportunity/industryDay titles (case-insensitive)" },
-      opportunityId: { type: "string", description: "Filter contacts linked to a specific opportunity" },
-      buyingOrgId: { type: "string", description: "Filter contacts linked to a specific buying org" },
-      limit: { type: "number", description: "Max results (default 20, max 50)" },
-      offset: { type: "number", description: "Number of results to skip for pagination (default 0)" },
+      title: "Search Contacts",
+      description: "Find contacts linked to opportunities, buying organizations, or industry days",
+      inputSchema: {
+        keyword: z.string().optional().describe("Searches linked opportunity/industryDay titles (case-insensitive)"),
+        opportunityId: z.string().optional().describe("Filter contacts linked to a specific opportunity"),
+        buyingOrgId: z.string().optional().describe("Filter contacts linked to a specific buying org"),
+        limit: z.number().optional().describe("Max results (default 20, max 50)"),
+        offset: z.number().optional().describe("Number of results to skip for pagination (default 0)"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ keyword, opportunityId, buyingOrgId, limit: rawLimit, offset: rawOffset }) => {
       try {

@@ -2,10 +2,19 @@ import { z } from "zod";
 import prisma from "../db.js";
 
 export function registerGetOpportunity(server) {
-  server.tool(
+  server.registerTool(
     "get_opportunity",
-    "Retrieve full details of a single procurement opportunity by ID, including buying org, award count, and contact count",
-    { id: z.string().describe("Opportunity ID") },
+    {
+      title: "Get Opportunity",
+      description: "Retrieve full details of a single procurement opportunity by ID, including buying org, award count, and contact count",
+      inputSchema: { id: z.string().describe("Opportunity ID") },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
     async ({ id }) => {
       try {
         const opportunity = await prisma.opportunity.findUnique({

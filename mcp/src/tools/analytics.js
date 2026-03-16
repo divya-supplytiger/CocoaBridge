@@ -1,11 +1,17 @@
 import prisma from "../db.js";
 
 export function registerAnalyticsTools(server) {
-  server.tool(
+  server.registerTool(
     "get_analytics_summary",
-    "Get a high-level summary of the procurement database: total opportunities, awards, obligated spend, top agencies, and recent opportunities",
     {
-      
+      title: "Get Analytics Summary",
+      description: "Get a high-level summary of the procurement database: total opportunities, awards, obligated spend, top agencies, and recent opportunities",
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async () => {
       try {

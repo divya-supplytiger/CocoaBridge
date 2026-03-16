@@ -1,14 +1,24 @@
+import { z } from "zod";
 import prisma from "../db.js";
 
 export function registerSearchRecipients(server) {
-  server.tool(
+  server.registerTool(
     "search_recipients",
-    "Find award recipients (prime contractors) by name or UEI",
     {
-      name: { type: "string", description: "Case-insensitive contains match on name" },
-      uei: { type: "string", description: "Exact match on UEI" },
-      limit: { type: "number", description: "Max results (default 20, max 50)" },
-      offset: { type: "number", description: "Number of results to skip for pagination (default 0)" },
+      title: "Search Recipients",
+      description: "Find award recipients (prime contractors) by name or UEI",
+      inputSchema: {
+        name: z.string().optional().describe("Case-insensitive contains match on name"),
+        uei: z.string().optional().describe("Exact match on UEI"),
+        limit: z.number().optional().describe("Max results (default 20, max 50)"),
+        offset: z.number().optional().describe("Number of results to skip for pagination (default 0)"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ name, uei, limit: rawLimit, offset: rawOffset }) => {
       try {

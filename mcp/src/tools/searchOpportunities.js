@@ -1,22 +1,28 @@
+import { z } from "zod";
 import prisma from "../db.js";
 
 export function registerSearchOpportunities(server) {
-  server.tool(
+  server.registerTool(
     "search_opportunities",
-    "Find procurement opportunities by keyword, type, NAICS, PSC, state, or active status",
     {
-      keyword: { type: "string", description: "Searches title + description (case-insensitive contains)" },
-      type: {
-        type: "string",
-        description: "Opportunity type",
-        enum: ["PRE_SOLICITATION", "AWARD_NOTICE", "SOURCES_SOUGHT", "SPECIAL_NOTICE", "SOLICITATION", "OTHER"],
+      title: "Search Opportunities",
+      description: "Find procurement opportunities by keyword, type, NAICS, PSC, state, or active status",
+      inputSchema: {
+        keyword: z.string().optional().describe("Searches title + description (case-insensitive contains)"),
+        type: z.enum(["PRE_SOLICITATION", "AWARD_NOTICE", "SOURCES_SOUGHT", "SPECIAL_NOTICE", "SOLICITATION", "OTHER"]).optional().describe("Opportunity type"),
+        naics: z.string().optional().describe("Match against naicsCodes array"),
+        psc: z.string().optional().describe("Match pscCode"),
+        state: z.string().optional().describe("Match state field"),
+        active: z.boolean().optional().describe("Filter by active status"),
+        limit: z.number().optional().describe("Max results (default 20, max 50)"),
+        offset: z.number().optional().describe("Number of results to skip for pagination (default 0)"),
       },
-      naics: { type: "string", description: "Match against naicsCodes array" },
-      psc: { type: "string", description: "Match pscCode" },
-      state: { type: "string", description: "Match state field" },
-      active: { type: "boolean", description: "Filter by active status" },
-      limit: { type: "number", description: "Max results (default 20, max 50)" },
-      offset: { type: "number", description: "Number of results to skip for pagination (default 0)" },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
     },
     async ({ keyword, type, naics, psc, state, active, limit: rawLimit, offset: rawOffset }) => {
       try {

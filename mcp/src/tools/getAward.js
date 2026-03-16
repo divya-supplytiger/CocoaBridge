@@ -2,10 +2,19 @@ import { z } from "zod";
 import prisma from "../db.js";
 
 export function registerGetAward(server) {
-  server.tool(
+  server.registerTool(
     "get_award",
-    "Retrieve full details of a single federal contract award by ID, including recipient, buying org, and linked opportunity",
-    { id: z.string().describe("Award ID") },
+    {
+      title: "Get Award",
+      description: "Retrieve full details of a single federal contract award by ID, including recipient, buying org, and linked opportunity",
+      inputSchema: { id: z.string().describe("Award ID") },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
     async ({ id }) => {
       try {
         const award = await prisma.award.findUnique({
