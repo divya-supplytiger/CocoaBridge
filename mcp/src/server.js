@@ -2,7 +2,9 @@ import "dotenv/config";
 import { createServer } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createMcpServer } from "./mcpServer.js";
+import { ENV } from "./env.js";
 
+// --- Vercel-compatible serverless handler ---
 /**
  * HTTP entry point for the CocoaBridge MCP Server.
  *
@@ -22,9 +24,9 @@ export default async function handler(req, res) {
   }
 
   // --- Bearer auth (SEC1) — enforced in production, skipped in dev ---
-  const isProd = process.env.NODE_ENV === "production";
+  const isProd = ENV.NODE_ENV === "production";
   if (isProd) {
-    const expected = process.env.MCP_SECRET;
+    const expected = ENV.MCP_SECRET;
     const auth = req.headers["authorization"];
     if (!expected || !auth || auth !== `Bearer ${expected}`) {
       res.writeHead(401, { "Content-Type": "application/json" });
@@ -51,7 +53,7 @@ const isDirectRun =
   import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/"));
 
 if (isDirectRun) {
-  const PORT = process.env.PORT || 3001;
+  const PORT = ENV.PORT;
   const httpServer = createServer(handler);
   httpServer.listen(PORT, () => {
     console.log(`MCP HTTP server listening on http://localhost:${PORT}`);
