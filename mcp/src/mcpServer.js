@@ -1,5 +1,13 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerAnalyticsTools } from "./tools/analytics.js";
+import { registerSearchOpportunities } from "./tools/searchOpportunities.js";
+import { registerGetOpportunity } from "./tools/getOpportunity.js";
+import { registerSearchAwards } from "./tools/searchAwards.js";
+import { registerGetAward } from "./tools/getAward.js";
+import { registerSearchBuyingOrgs } from "./tools/searchBuyingOrgs.js";
+import { registerGetBuyingOrg } from "./tools/getBuyingOrg.js";
+import { registerSearchRecipients } from "./tools/searchRecipients.js";
+import { registerSearchContacts } from "./tools/searchContacts.js";
 
 export function createMcpServer() {
   const server = new McpServer({
@@ -12,6 +20,14 @@ export function createMcpServer() {
   });
 
   registerAnalyticsTools(server);
+  registerSearchOpportunities(server);
+  registerGetOpportunity(server);
+  registerSearchAwards(server);
+  registerGetAward(server);
+  registerSearchBuyingOrgs(server);
+  registerGetBuyingOrg(server);
+  registerSearchRecipients(server);
+  registerSearchContacts(server);
 
   return server;
 }

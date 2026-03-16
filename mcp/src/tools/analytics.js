@@ -4,7 +4,9 @@ export function registerAnalyticsTools(server) {
   server.tool(
     "get_analytics_summary",
     "Get a high-level summary of the procurement database: total opportunities, awards, obligated spend, top agencies, and recent opportunities",
-    {},
+    {
+      
+    },
     async () => {
       try {
         const [totalOpportunities, totalAwards, aggregation, topAgencies, recentOpportunities] =

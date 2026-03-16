@@ -19,6 +19,7 @@ const adapter = new PrismaPg(pool);
 
 const prisma = new PrismaClient({
   log: ["error", "warn"],
+  errorFormat: "minimal",
   adapter,
 });
 

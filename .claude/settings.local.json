@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(xargs grep -l \"npm\")"
+      "Bash(xargs grep -l \"npm\")",
+      "Bash(node src/stdio.js)"
     ]
   }
 }
