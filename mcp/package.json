@@ -1,0 +1,33 @@
+{
+  "name": "cocoabridge-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "@ai-sdk/google": "^3.0.43",
+    "@inquirer/prompts": "^8.3.2",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@prisma/adapter-pg": "^7.3.0",
+    "@prisma/client": "^7.3.0",
+    "ai": "^6.0.116",
+    "dotenv": "^16.6.1",
+    "pg": "^8.17.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/inspector": "^0.21.1",
+    "prisma": "^7.3.0"
+  },
+  "scripts": {
+    "mcp:server:start": "node src/server.js",
+    "mcp:server:dev": "nodemon src/server.js",
+    "mcp:client:start": "node src/client.js",
+    "mcp:client:dev": "nodemon src/client.js",
+    "mcp:server:inspect": "set DANGEROUSLY_OMIT_AUTH=true && npx @modelcontextprotocol/inspector node src/server.js",
+    "postinstall": "prisma generate --schema ../backend/prisma/schema.prisma"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

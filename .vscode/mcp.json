@@ -1,0 +1,20 @@
+{
+	"servers": {
+		"cocoabridge-mcp": {
+			"type": "stdio",
+			"command": "node",
+			"args": [
+				"src/server.js"
+			],
+			"cwd": "${workspaceFolder}/mcp",
+			"dev": {
+				"watch": "src/**/*.js",
+				"debug": {
+					"type": "node"
+				}
+
+			}
+		}
+	},
+		"inputs": []
+}

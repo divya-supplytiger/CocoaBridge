@@ -1,0 +1,105 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "John Smith",
+      "email": "john.smith@example.com",
+      "address": "123 Main St, Springfield, IL 62701",
+      "phone": "+1-217-555-0101"
+    },
+    {
+      "id": 2,
+      "name": "Sarah Johnson",
+      "email": "sarah.johnson@example.com",
+      "address": "456 Oak Ave, Chicago, IL 60601",
+      "phone": "+1-312-555-0102"
+    },
+    {
+      "id": 3,
+      "name": "Michael Chen",
+      "email": "michael.chen@example.com",
+      "address": "789 Pine Rd, Aurora, IL 60505",
+      "phone": "+1-331-555-0103"
+    },
+    {
+      "id": 4,
+      "name": "Divya Verma",
+      "email": "divya@proton.me",
+      "address": "2131 Red Fox Drive",
+      "phone": "+1 717-406 5824"
+    },
+    {
+      "id": 5,
+      "name": "Lisa",
+      "email": "lisa@nyc.com",
+      "address": "123 Sesame Street, New York, NY, 28482",
+      "phone": "+1 292-315-5555"
+    },
+    {
+      "id": 6,
+      "name": "Test User",
+      "email": "testuser@example.com",
+      "address": "123 Main St",
+      "phone": "555-1234"
+    },
+    {
+      "id": 7,
+      "name": "Lucy Hale",
+      "email": "lucy@gmail.com",
+      "address": "123 Hale St, New York, NY, 92893",
+      "phone": "+1 323 456-7890"
+    },
+    {
+      "id": 8,
+      "name": "Jude",
+      "email": "jude.richardson@gmail.com",
+      "address": "742 Oak Ridge Drive, Portland, OR 97214",
+      "phone": "+1 503-555-0847"
+    },
+    {
+      "id": 9,
+      "name": {
+        "name": "Maya Bennett",
+        "email": "maya.bennett@example.com",
+        "address": {
+          "street": "418 Willow Creek Rd",
+          "city": "Madison",
+          "state": "WI",
+          "postalCode": "53703",
+          "country": "USA"
+        },
+        "phone": "+1-202-555-0147"
+      }
+    },
+    {
+      "id": 10,
+      "name": "Gary",
+      "email": "gary@gmail.com",
+      "address": "126 Rockledge Dr, Mechanicsburg, PA, 17036",
+      "phone": "+1 717 579-6915"
+    },
+    {
+      "id": 11,
+      "name": {
+        "name": "Sarah Chen",
+        "email": "sarah.chen@example.com",
+        "address": "789 Pine Ln, Denver, CO 80202",
+        "phone": "(720) 555-1234"
+      }
+    },
+    {
+      "id": 12,
+      "name": "Taylor Swift",
+      "email": "taylor@nation.com",
+      "address": "13 Cornelia St, TS",
+      "phone": "+1 121 302 1989"
+    },
+    {
+      "id": 13,
+      "name": "Tia",
+      "email": "tia@hotmail.com",
+      "address": "1292831",
+      "phone": "1920192382"
+    }
+  ]
+}
