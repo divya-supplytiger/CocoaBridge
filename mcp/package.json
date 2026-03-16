@@ -12,17 +12,17 @@
     "@prisma/client": "^7.3.0",
     "dotenv": "^16.6.1",
     "pg": "^8.17.2",
+    "prisma": "^7.3.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
-    "@modelcontextprotocol/inspector": "^0.21.1",
-    "prisma": "^7.3.0"
+    "@modelcontextprotocol/inspector": "^0.21.1"
   },
   "scripts": {
     "start": "node src/server.js",
     "stdio": "node src/stdio.js",
     "inspect": "npx @modelcontextprotocol/inspector node src/stdio.js",
-    "postinstall": "prisma generate --schema ../backend/prisma/schema.prisma"
+    "postinstall": "node scripts/prisma-generate.mjs"
   },
   "keywords": [],
   "author": "",
