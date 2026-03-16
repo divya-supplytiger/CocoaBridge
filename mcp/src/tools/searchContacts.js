@@ -8,7 +8,7 @@ export function registerSearchContacts(server) {
       title: "Search Contacts",
       description: "Find contacts linked to opportunities, buying organizations, or industry days",
       inputSchema: {
-        keyword: z.string().optional().describe("Searches linked opportunity/industryDay titles (case-insensitive)"),
+        keyword: z.string().optional().describe("Searches linked opportunity titles/descriptions and industryDay titles/summaries (case-insensitive)"),
         opportunityId: z.string().optional().describe("Filter contacts linked to a specific opportunity"),
         buyingOrgId: z.string().optional().describe("Filter contacts linked to a specific buying org"),
         limit: z.number().optional().describe("Max results (default 20, max 50)"),
@@ -34,7 +34,9 @@ export function registerSearchContacts(server) {
         if (keyword) {
           where.OR = [
             { opportunity: { title: { contains: keyword, mode: "insensitive" } } },
+            { opportunity: { description: { contains: keyword, mode: "insensitive" } } },
             { industryDay: { title: { contains: keyword, mode: "insensitive" } } },
+            { industryDay: { summary: { contains: keyword, mode: "insensitive" } } },
           ];
         }
 
