@@ -11,6 +11,7 @@ import { registerSearchContacts } from "./tools/searchContacts.js";
 import { registerScoreOpportunity } from "./tools/scoring.js";
 import { registerIntelligenceSummary } from "./tools/intelligence.js";
 import { registerResources } from "./resourcesConfig.js";
+import { registerPrompts } from "./prompts.js";
 
 export function createMcpServer() {
   const server = new McpServer({
@@ -20,6 +21,7 @@ export function createMcpServer() {
     capabilities: {
       tools: {},
       resources: {},
+      prompts: {},
     },
   });
 
@@ -35,6 +37,7 @@ export function createMcpServer() {
   registerScoreOpportunity(server);
   registerIntelligenceSummary(server);
   registerResources(server);
+  registerPrompts(server);
 
   return server;
 }

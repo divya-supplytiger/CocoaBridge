@@ -1,6 +1,7 @@
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import prisma from "./db.js";
 import { COMPANY_PROFILE } from "./resources/companyProfile.js";
+import { BID_TEMPLATE } from "./resources/bidTemplate.js";
 
 export function registerResources(server) {
   // --- Static resource: company profile ---
@@ -14,6 +15,22 @@ export function registerResources(server) {
           uri: "supplytiger://company/profile",
           mimeType: "application/json",
           text: JSON.stringify(COMPANY_PROFILE, null, 2),
+        },
+      ],
+    }),
+  );
+
+  // --- Static resource: bid/proposal template ---
+  server.resource(
+    "bid-template",
+    "supplytiger://templates/bid",
+    { description: "Federal bid/proposal template — standard sections, evaluation factors, requirement types (SOW/PWS/SOO), compliance checklist, and elicitation prompts. Based on GSA guidance and FAR Part 15." },
+    async () => ({
+      contents: [
+        {
+          uri: "supplytiger://templates/bid",
+          mimeType: "application/json",
+          text: JSON.stringify(BID_TEMPLATE, null, 2),
         },
       ],
     }),
