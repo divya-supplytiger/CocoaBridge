@@ -21,7 +21,8 @@
   "scripts": {
     "start": "node src/server.js",
     "stdio": "node src/stdio.js",
-    "inspect": "npx @modelcontextprotocol/inspector node src/stdio.js",
+    "inspect:http": "npx @modelcontextprotocol/inspector node src/server.js",
+    "inspect:stdio": "set DANGEROUSLY_OMIT_AUTH=true && npx @modelcontextprotocol/inspector node src/stdio.js",
     "postinstall": "node scripts/prisma-generate.mjs"
   },
   "keywords": [],

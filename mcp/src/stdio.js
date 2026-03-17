@@ -20,3 +20,4 @@ const server = createMcpServer();
 const transport = new StdioServerTransport();
 
 await server.connect(transport);
+console.error(`MCP stdio server running in: ${process.cwd()}`);
