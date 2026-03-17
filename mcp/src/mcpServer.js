@@ -9,6 +9,7 @@ import { registerGetBuyingOrg } from "./tools/getBuyingOrg.js";
 import { registerSearchRecipients } from "./tools/searchRecipients.js";
 import { registerSearchContacts } from "./tools/searchContacts.js";
 import { registerScoreOpportunity } from "./tools/scoring.js";
+import { registerIntelligenceSummary } from "./tools/intelligence.js";
 import { registerResources } from "./resourcesConfig.js";
 
 export function createMcpServer() {
@@ -32,6 +33,7 @@ export function createMcpServer() {
   registerSearchRecipients(server);
   registerSearchContacts(server);
   registerScoreOpportunity(server);
+  registerIntelligenceSummary(server);
   registerResources(server);
 
   return server;
