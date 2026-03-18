@@ -60,5 +60,10 @@ export async function callMcpTool(toolName, args) {
     throw new Error(`MCP error: ${result.error.message || JSON.stringify(result.error)}`);
   }
 
-  return JSON.parse(result.result.content[0].text);
+  const text = result.result.content[0].text;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }
