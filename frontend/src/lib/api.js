@@ -119,6 +119,29 @@ export const analyticsApi = {
   getAgencies:   async (params) => { const { data } = await axiosInstance.get("/db/analytics/agencies",   { params }); return data; },
 };
 
+export const chatApi = {
+  listConversations: async () => {
+    const { data } = await axiosInstance.get("/chat/conversations");
+    return data;
+  },
+  getMessages: async (conversationId) => {
+    const { data } = await axiosInstance.get(`/chat/conversations/${conversationId}/messages`);
+    return data;
+  },
+  deleteConversation: async (id) => {
+    const { data } = await axiosInstance.delete(`/chat/conversations/${id}`);
+    return data;
+  },
+  updateConversation: async (id, body) => {
+    const { data } = await axiosInstance.patch(`/chat/conversations/${id}`, body);
+    return data;
+  },
+  getModels: async () => {
+    const { data } = await axiosInstance.get("/chat/models");
+    return data;
+  },
+};
+
 export const adminApi = {
   // Current authenticated user's DB profile (all roles)
   getCurrentUser: async () => {
