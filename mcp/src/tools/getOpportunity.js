@@ -6,7 +6,7 @@ export function registerGetOpportunity(server) {
     "get_opportunity",
     {
       title: "Get Opportunity",
-      description: "Retrieve full details of a single procurement opportunity by ID, including buying org, award count, and contact count",
+      description: "Retrieve full details of a single procurement opportunity by ID, including buying org, award count, and linked contacts",
       inputSchema: { id: z.string().describe("Opportunity ID") },
       annotations: {
         readOnlyHint: true,
@@ -23,10 +23,17 @@ export function registerGetOpportunity(server) {
             buyingOrganization: {
               select: { id: true, name: true, level: true },
             },
+            contactLinks: {
+              select: {
+                type: true,
+                contact: {
+                  select: { fullName: true, email: true, phone: true, title: true },
+                },
+              },
+            },
             _count: {
               select: {
                 awards: true,
-                contactLinks: true,
               },
             },
           },
@@ -39,11 +46,14 @@ export function registerGetOpportunity(server) {
           };
         }
 
-        const { _count, ...rest } = opportunity;
+        const { _count, contactLinks, ...rest } = opportunity;
         const result = {
           ...rest,
           awardCount: _count.awards,
-          contactCount: _count.contactLinks,
+          contacts: contactLinks.map((cl) => ({
+            ...cl.contact,
+            type: cl.type,
+          })),
         };
 
         return {
