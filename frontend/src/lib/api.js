@@ -101,6 +101,10 @@ export const dbApi = {
     const { data } = await axiosInstance.patch(`/db/contacts/${id}`, body);
     return data;
   },
+  deleteContact: async (id) => {
+    const { data } = await axiosInstance.delete(`/db/contacts/${id}`);
+    return data;
+  },
   // Favorites
   listFavorites: async () => {
     const { data } = await axiosInstance.get("/db/favorites");

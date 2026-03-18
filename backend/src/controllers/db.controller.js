@@ -810,6 +810,7 @@ export const listContacts = async (req, res) => {
         skip,
         take: limit,
         include: {
+          _count: { select: { links: { where: { opportunityId: { not: null } } } } },
           links: {
             where: { buyingOrganizationId: { not: null } },
             take: 1,
@@ -859,6 +860,24 @@ export const updateContact = async (req, res) => {
   } catch (error) {
     if (error?.code === "P2025") return res.status(404).json({ error: "Contact not found" });
     console.error("updateContact error:", error);
+    return res.status(500).json({ error: "Internal server error", details: error.message });
+  }
+};
+
+export const deleteContact = async (req, res) => {
+  try {
+    const contact = await prisma.contact.findUnique({
+      where: { id: req.params.id },
+      include: { links: { where: { opportunityId: { not: null } }, select: { id: true }, take: 1 } },
+    });
+    if (!contact) return res.status(404).json({ error: "Contact not found" });
+    if (contact.links.length > 0) {
+      return res.status(409).json({ error: "Cannot delete a contact that is linked to an opportunity" });
+    }
+    await prisma.contact.delete({ where: { id: req.params.id } });
+    return res.json({ data: { id: req.params.id } });
+  } catch (error) {
+    console.error("deleteContact error:", error);
     return res.status(500).json({ error: "Internal server error", details: error.message });
   }
 };
