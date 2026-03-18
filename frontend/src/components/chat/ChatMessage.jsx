@@ -81,7 +81,7 @@ const CopyButton = ({ text, isUser }) => {
 
 const ChatMessage = ({ message, owner }) => {
   const isUser = message.role === "user";
-  const displayName = isUser ? owner?.name ?? "User" : "CocoaBridge AI";
+  const displayName = isUser ? owner?.name ?? "User" : "Mary";
 
   const hasContent = message.content ||
     message.parts?.some((p) => (p.type === "text" && p.text) || p.type === "tool-invocation");
