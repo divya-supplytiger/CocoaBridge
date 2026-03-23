@@ -105,6 +105,15 @@ export const dbApi = {
     const { data } = await axiosInstance.delete(`/db/contacts/${id}`);
     return data;
   },
+  // NSN Items
+  listNsnItems: async (params) => {
+    const { data } = await axiosInstance.get("/db/nsn-items", { params });
+    return data;
+  },
+  getNsnItem: async (id) => {
+    const { data } = await axiosInstance.get(`/db/nsn-items/${id}`);
+    return data;
+  },
   // Favorites
   listFavorites: async () => {
     const { data } = await axiosInstance.get("/db/favorites");

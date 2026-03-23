@@ -21,6 +21,13 @@ const buyingOrgColumns = [
   { accessor: "website", header: "Website", render: (val) => val ?? "—" },
 ];
 
+const nsnColumns = [
+  { accessor: "nsn", header: "NSN", render: (val) => val ?? "—" },
+  { accessor: "pscCode", header: "PSC", sortable: true, render: (val) => val ?? "—" },
+  { accessor: "niin", header: "NIIN", render: (val) => val ?? "—" },
+  { accessor: "itemName", header: "Item Name", sortable: true, render: (val) => val ?? "—" },
+];
+
 const LEVELS = ["AGENCY", "SUBAGENCY", "OFFICE", "OTHER"];
 
 const RecipientsTab = () => {
@@ -141,12 +148,75 @@ const BuyingOrgsTab = () => {
   );
 };
 
+const NsnItemsTab = () => {
+  const [page, setPage] = useState(1);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [sort, setSort] = useState({ field: null, dir: "asc" });
+  const [supplyTigerOnly, setSupplyTigerOnly] = useState(true);
+
+  const handleSort = useCallback((field) => {
+    setSort((prev) => ({
+      field,
+      dir: prev.field === field && prev.dir === "asc" ? "desc" : "asc",
+    }));
+    setPage(1);
+  }, []);
+
+  const { data: result, isLoading, isError, error } = useQuery({
+    queryKey: ["nsn-items", page, debouncedSearch, sort, supplyTigerOnly],
+    queryFn: () => dbApi.listNsnItems({
+      page,
+      limit: 50,
+      search: debouncedSearch || undefined,
+      supplyTigerOnly: supplyTigerOnly || undefined,
+      ...(sort.field && { sortBy: sort.field, sortDir: sort.dir }),
+    }),
+  });
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <SearchBar
+          placeholder="Search by item name, or description..."
+          onSearch={(val) => { setDebouncedSearch(val); setSort({ field: null, dir: "asc" }); setPage(1); }}
+        />
+        <label className="label cursor-pointer gap-2">
+          <input
+            type="checkbox"
+            className="checkbox checkbox-primary"
+            checked={supplyTigerOnly}
+            onChange={(e) => { setSupplyTigerOnly(e.target.checked); setPage(1); }}
+          />
+          <span className="label-text font-semibold whitespace-nowrap">SupplyTiger Only</span>
+
+        </label>
+      </div>
+      <Table
+        columns={nsnColumns}
+        data={result?.data ?? []}
+        isLoading={isLoading}
+        isError={isError}
+        error={error}
+        meta={result?.meta}
+        page={page}
+        onPageChange={setPage}
+        basePath="/nsn-items"
+        sort={sort}
+        onSort={handleSort}
+        emptyMessage={debouncedSearch ? "No results found" : "No NSN Items"}
+        emptySubMessage={debouncedSearch ? `No NSN items match "${debouncedSearch}".` : "NSN items will appear here once available."}
+      />
+    </div>
+  );
+};
+
 const MarketIntelligencePage = () => {
 
-   const tabs = [
-  { label: "Recipients", value: "recipients" },
-  { label: "Buying Agencies", value: "buying-orgs" },
-];
+  const tabs = [
+    { label: "Recipients", value: "recipients" },
+    { label: "Buying Agencies", value: "buying-orgs" },
+    { label: "NSN Items", value: "nsn-items" },
+  ];
   const [activeTab, setActiveTab] = useState(tabs[0].value);
 
   const handleTabChange = (tab) => {
@@ -157,7 +227,7 @@ const MarketIntelligencePage = () => {
     <div className="flex flex-col gap-4">
         <TabsJoinButton tabs={tabs} activeTab={activeTab} setActiveTab={handleTabChange} />
 
-      {activeTab === "recipients" ? <RecipientsTab /> : <BuyingOrgsTab />}
+      {activeTab === "recipients" ? <RecipientsTab /> : activeTab === "buying-orgs" ? <BuyingOrgsTab /> : <NsnItemsTab />}
     </div>
   );
 };
