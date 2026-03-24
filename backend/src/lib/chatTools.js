@@ -147,6 +147,16 @@ export const chatTools = {
     execute: (args) => callMcpTool("search_publog_items", args),
   }),
 
+  get_cid_spec: tool({
+    description:
+      "Look up a USDA Commercial Item Description (CID) specification by CID code or PSC code. Returns structured spec data (scope, classification, salient characteristics, analytical requirements, QA provisions, packaging) plus DB metadata. Use for product labeling, compliance, or spec questions.",
+    parameters: z.object({
+      cidCode: z.string().optional().describe("CID code (e.g., 'A-A-20177G')"),
+      psc: z.string().optional().describe("PSC code (e.g., '8925'). Returns all CID specs under this PSC."),
+    }),
+    execute: (args) => callMcpTool("get_cid_spec", args),
+  }),
+
   generate_bid_draft: tool({
     description:
       "Generate a structured draft bid/proposal for a specific opportunity using SupplyTiger's company profile, bid template, and opportunity details. Returns detailed instructions for drafting the bid with placeholders for user input.",

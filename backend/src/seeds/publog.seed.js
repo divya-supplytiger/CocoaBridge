@@ -126,37 +126,43 @@ async function seedNationalStockNumbers() {
 async function seedCommercialItemDescs() {
   console.log("Seeding Commercial Item Descriptions...");
 
-  const cidPath = resolve(CONTEXT_DIR, "8925_CID_NUMBERS.txt");
-  const cidRecords = parseCidJson(cidPath);
+  const cidFiles = [
+    // { path: resolve(CONTEXT_DIR, "8970-A-A-20331B_CID_NUMBERS.txt"), psc: "8970" },
+    { path: resolve(CONTEXT_DIR, "8950-A-A-20001C_CID_NUMBERS.txt"), psc: "8950" },
+  ];
 
-  let count = 0;
-  for (const entry of cidRecords) {
-    const cid = entry.cid;
-    if (!cid) continue;
+  for (const { path: cidPath, psc } of cidFiles) {
+    const cidRecords = parseCidJson(cidPath);
 
-    // Handle array or string dates
-    const date = Array.isArray(entry.date) ? entry.date.join("; ") : (entry.date || null);
-    const description = entry.description || "";
-    const qaPkg = entry.qapkg || null;
-    const qaPkgDate = Array.isArray(entry.qapkg_date) ? entry.qapkg_date.join("; ") : (entry.qapkg_date || null);
+    let count = 0;
+    for (const entry of cidRecords) {
+      const cid = entry.cid;
+      if (!cid) continue;
 
-    await prisma.commercialItemDesc.upsert({
-      where: { cid },
-      update: { date, description, qaPkg, qaPkgDate, pscCode: "8925" },
-      create: { cid, date, description, qaPkg, qaPkgDate, pscCode: "8925" },
-    });
-    count++;
+      // Handle array or string dates
+      const date = Array.isArray(entry.date) ? entry.date.join("; ") : (entry.date || null);
+      const description = entry.description || "";
+      const qaPkg = entry.qapkg || null;
+      const qaPkgDate = Array.isArray(entry.qapkg_date) ? entry.qapkg_date.join("; ") : (entry.qapkg_date || null);
+
+      await prisma.commercialItemDesc.upsert({
+        where: { cid },
+        update: { date, description, qaPkg, qaPkgDate, pscCode: psc },
+        create: { cid, date, description, qaPkg, qaPkgDate, pscCode: psc },
+      });
+      count++;
+    }
+
+    console.log(`  PSC ${psc} CIDs: ${count} entries`);
   }
-
-  console.log(`  CIDs: ${count} entries`);
 }
 
 async function main() {
   console.log("=== Publog Reference Data Seed ===\n");
 
   try {
-    await seedPscClasses();
-    await seedNationalStockNumbers();
+    // await seedPscClasses();
+    // await seedNationalStockNumbers();
     await seedCommercialItemDescs();
     console.log("\nSeed complete.");
   } catch (error) {
