@@ -2,6 +2,7 @@ import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import prisma from "./db.js";
 import { COMPANY_PROFILE } from "./resources/companyProfile.js";
 import { BID_TEMPLATE } from "./resources/bidTemplate.js";
+import { CID_SPECS } from "./resources/cidSpecs.js";
 
 export function registerResources(server) {
   // --- Static resource: company profile ---
@@ -58,6 +59,50 @@ export function registerResources(server) {
             uri: uri.href,
             mimeType: "application/json",
             text: JSON.stringify(opportunity, null, 2),
+          },
+        ],
+      };
+    },
+  );
+
+  // --- Resource template: CID spec (DB metadata + static USDA spec text) ---
+  server.resource(
+    "cid-spec",
+    new ResourceTemplate("publog://cid/{cidCode}", { list: undefined }),
+    { description: "Full USDA Commercial Item Description (CID) specification by CID code — DB metadata (dates, QA package, PSC class) plus the complete spec text (scope, classification, salient characteristics, analytical requirements, QA provisions, packaging). Available CIDs: A-A-20177G (candy), A-A-20001C (spices), A-A-20331B (survival food)." },
+    async (uri, { cidCode }) => {
+      const spec = CID_SPECS[cidCode];
+      if (!spec) {
+        throw new Error(`CID ${cidCode} not found. Available: ${Object.keys(CID_SPECS).join(", ")}`);
+      }
+
+      const dbRecord = await prisma.commercialItemDesc.findUnique({
+        where: { cid: cidCode },
+        include: {
+          pscClass: {
+            select: { psc: true, title: true, inclusions: true, exclusions: true, notes: true },
+          },
+        },
+      });
+
+      const metadata = dbRecord
+        ? {
+            cid: dbRecord.cid,
+            date: dbRecord.date,
+            description: dbRecord.description,
+            qaPkg: dbRecord.qaPkg,
+            qaPkgDate: dbRecord.qaPkgDate,
+            pscCode: dbRecord.pscCode,
+            pscClass: dbRecord.pscClass,
+          }
+        : { cid: spec.cid, pscCode: spec.pscCode, title: spec.title, date: spec.date };
+
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: "application/json",
+            text: JSON.stringify({ metadata, spec }, null, 2),
           },
         ],
       };

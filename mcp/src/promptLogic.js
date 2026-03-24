@@ -1,6 +1,27 @@
 import prisma from "./db.js";
 import { COMPANY_PROFILE, COMPANY_PSC_CODES } from "./resources/companyProfile.js";
 import { BID_TEMPLATE } from "./resources/bidTemplate.js";
+import { getCidSpecsByPsc, CID_PSC_CODES } from "./resources/cidSpecs.js";
+
+function buildCidSection(pscCode) {
+  if (!pscCode || !CID_PSC_CODES.includes(pscCode)) return "";
+
+  const specs = getCidSpecsByPsc(pscCode);
+  if (specs.length === 0) return "";
+
+  const specBlocks = specs.map((s) =>
+    `### ${s.cid} — ${s.title} (${s.date})\nSupersedes: ${s.supersedes}\n\n${JSON.stringify({ scope: s.scope, classification: s.classification, salientCharacteristics: s.salientCharacteristics, analyticalRequirements: s.analyticalRequirements, qualityAssurance: s.qualityAssurance, packaging: s.packaging }, null, 2)}`
+  ).join("\n\n---\n\n");
+
+  return `
+---
+
+## COMMERCIAL ITEM DESCRIPTION SPECS (PSC ${pscCode})
+
+These are structured USDA Commercial Item Description specifications for this opportunity's PSC code. CIDs define the government's minimum requirements for commercial items in this category — including scope, classification, salient characteristics, analytical requirements, QA provisions, and packaging. Reference these specs when assessing product compliance and drafting technical approaches.
+
+${specBlocks}`;
+}
 
 function notFoundResult(opportunityId) {
   return {
@@ -29,6 +50,7 @@ export async function buildBidDraftPrompt(opportunityId) {
 
   const companyJson = JSON.stringify(COMPANY_PROFILE, null, 2);
   const templateJson = JSON.stringify(BID_TEMPLATE, null, 2);
+  const cidSection = buildCidSection(opportunity.pscCode);
 
   const promptText = `You are drafting a bid/proposal response for the following federal procurement opportunity on behalf of SupplyTiger (Prime Printer Solution Inc).
 
@@ -58,7 +80,7 @@ ${companyJson}
 ## BID TEMPLATE & GUIDANCE
 
 ${templateJson}
-
+${cidSection}
 ---
 
 ## INSTRUCTIONS
@@ -348,6 +370,7 @@ export async function buildFulfillmentPrompt(opportunityId) {
   const companyJson = JSON.stringify(COMPANY_PROFILE, null, 2);
   const pscOverlap =
     opportunity.pscCode && COMPANY_PSC_CODES.includes(opportunity.pscCode);
+  const cidSection = buildCidSection(opportunity.pscCode);
 
   const promptText = `Perform a fulfillment capability analysis for SupplyTiger (Prime Printer Solution Inc) on the following federal procurement opportunity. Determine whether SupplyTiger should pursue a FULL submission, a PARTIAL/line-item bid, or NO-BID.
 
@@ -390,7 +413,7 @@ ${opportunity.pscCode
     : "No publog items found for this opportunity's PSC code."
   : "This opportunity has no PSC code — assess fulfillment capability from the description and NAICS codes."}
 
-${pscOverlap ? `\n> **Note:** The opportunity's PSC code (${opportunity.pscCode}) is one of SupplyTiger's core PSC codes. The two item sets above will overlap.\n` : ""}
+${pscOverlap ? `\n> **Note:** The opportunity's PSC code (${opportunity.pscCode}) is one of SupplyTiger's core PSC codes. The two item sets above will overlap.\n` : ""}${cidSection}
 ---
 
 ## HISTORICAL AWARDS FROM THIS AGENCY
