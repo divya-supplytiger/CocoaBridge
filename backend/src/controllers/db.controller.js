@@ -360,11 +360,12 @@ export const runBackfillOpportunityAttachments = async ({
         if (!resourceId) continue;
 
         const downloadUrl = `${SAM_RESOURCES_BASE}/resources/files/${resourceId}/download`;
+        const name = att.name || `attachment-${resourceId}`;
 
         await prisma.opportunityAttachment.upsert({
           where: { resourceId },
           update: {
-            name: att.name,
+            name,
             mimeType: att.mimeType || null,
             size: att.size ? Number(att.size) : null,
             postedDate: att.postedDate ? new Date(att.postedDate) : null,
@@ -373,7 +374,7 @@ export const runBackfillOpportunityAttachments = async ({
           },
           create: {
             resourceId,
-            name: att.name,
+            name,
             mimeType: att.mimeType || null,
             size: att.size ? Number(att.size) : null,
             postedDate: att.postedDate ? new Date(att.postedDate) : null,
