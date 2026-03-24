@@ -13,6 +13,7 @@ import { registerIntelligenceSummary } from "./tools/intelligence.js";
 import { registerSearchPublogItems } from "./tools/searchPublogItems.js";
 import { registerResources } from "./resourcesConfig.js";
 import { registerPrompts } from "./prompts.js";
+import { registerPromptTools } from "./tools/promptTools.js";
 
 export function createMcpServer() {
   const server = new McpServer({
@@ -40,6 +41,7 @@ export function createMcpServer() {
   registerSearchPublogItems(server);
   registerResources(server);
   registerPrompts(server);
+  registerPromptTools(server);
 
   return server;
 }
