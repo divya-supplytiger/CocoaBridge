@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Inbox } from "lucide-react";
+import { Trash2, Inbox, FileText, Download } from "lucide-react";
 import toast from "react-hot-toast";
 import { dbApi } from "../lib/api.js";
 import { useCurrentUser } from "../lib/CurrentUserContext.jsx";
@@ -130,6 +130,60 @@ const OpportunityDetail = () => {
         </ItemDetail>
         {item && (
           <RelatedRecordsCard contactLinks={contactLinks} />
+        )}
+        {item?.attachments?.length > 0 && (
+          <div className="card bg-base-100 shadow-sm mt-4">
+            <div className="card-body">
+              <h2 className="card-title text-base gap-2">
+                <FileText className="size-5" />
+                Attachments ({item.attachments.length})
+              </h2>
+              <div className="overflow-x-auto">
+                <table className="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>File</th>
+                      <th>Type</th>
+                      <th>Size</th>
+                      <th>Posted</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {item.attachments.map((att) => (
+                      <tr key={att.id}>
+                        <td className="font-mono text-sm max-w-xs truncate">{att.name}</td>
+                        <td>
+                          <span className="badge badge-ghost badge-sm">
+                            {att.mimeType?.replace(".", "").toUpperCase() || "—"}
+                          </span>
+                        </td>
+                        <td className="text-sm">
+                          {att.size ? (att.size < 1024 * 1024
+                            ? `${(att.size / 1024).toFixed(0)} KB`
+                            : `${(att.size / (1024 * 1024)).toFixed(1)} MB`
+                          ) : "—"}
+                        </td>
+                        <td className="text-sm">
+                          {att.postedDate ? new Date(att.postedDate).toLocaleDateString() : "—"}
+                        </td>
+                        <td>
+                          <a
+                            href={att.downloadUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-ghost btn-xs"
+                          >
+                            <Download className="size-4" />
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
