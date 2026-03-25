@@ -26,6 +26,7 @@ The system is designed to:
 | **Background Jobs** | Inngest (cron syncs + event-driven inbox creation) |
 | **MCP Server** | Model Context Protocol SDK + Zod validation |
 | **AI / Chat** | Vercel AI SDK (`@ai-sdk/react`) with multi-model support |
+| **Document Parsing** | pdf-parse (PDF), mammoth (DOCX) |
 | **External APIs** | SAM.gov, USASpending.gov |
 | **State Management** | TanStack React Query |
 | **Deployment** | Vercel |
@@ -142,6 +143,9 @@ SupplyTigerGOA/
 ├── mcp/                          # MCP Server (AI data layer)
 │   └── src/
 │       ├── mcpServer.js          # Tool registry & server setup
+│       ├── promptLogic.js        # Prompt builders for bid drafts, fit analysis, fulfillment
+│       ├── resources/
+│       │   └── cidSpecs.js       # USDA CID specification data (8925, 8950, 8970)
 │       └── tools/                # Individual MCP tool definitions
 ├── backend/
 │   ├── package.json
@@ -189,6 +193,8 @@ SupplyTigerGOA/
         │   ├── Row.jsx                   # Single table row
         │   ├── ItemDetail.jsx            # Shared detail card (title, badges, fields, children)
         │   ├── RelatedRecordsCard.jsx    # Linked records panel (opps, awards, orgs, contacts)
+        │   ├── Modal.jsx                 # Reusable DaisyUI modal wrapper (open, onClose, title, children)
+        │   ├── ParsedTextModal.jsx       # Attachment parse/preview/save modal with preview-then-save flow
         │   ├── FavoriteButton.jsx        # Star toggle button; optimistic UI; works on opportunities + awards
         │   ├── TabsJoinButton.jsx        # Reusable DaisyUI join-style tab switcher
         │   ├── ChatMessage.jsx           # Message rendering with tool invocations
@@ -224,7 +230,7 @@ SupplyTigerGOA/
 
 The MCP (Model Context Protocol) server acts as the **sole data access layer for all AI interactions**, providing a clean separation between the chat interface and the database.
 
-### Tools (11)
+### Tools (17)
 
 | Tool | Description |
 |------|-------------|
@@ -236,9 +242,18 @@ The MCP (Model Context Protocol) server acts as the **sole data access layer for
 | `get_buying_org` | Get buying org details including parent, children, and counts |
 | `search_recipients` | Find award recipients (prime contractors) by name or UEI |
 | `search_contacts` | Find contacts linked to opportunities, buying orgs, or industry days |
+| `search_publog_items` | Search federal supply items by keyword, PSC, NIIN, or NSN from DLA Publog data |
+| `get_cid_spec` | Look up USDA Commercial Item Description (CID) specs by CID code or PSC code |
 | `get_analytics_summary` | High-level database summary: totals, top agencies, recent opportunities |
 | `score_opportunity` | Score an opportunity against SupplyTiger's company profile (HIGH/MEDIUM/LOW fit) |
 | `get_intelligence_summary` | Deep procurement intelligence for a NAICS code, PSC code, or buying org |
+| `generate_bid_draft` | Generate a structured draft bid/proposal for a specific opportunity |
+| `analyze_opportunity_fit` | Analyze competitive landscape, incumbents, and recommend GO/NO-GO/CONDITIONAL |
+| `analyze_fulfillment` | Determine FULL/PARTIAL/NO-BID based on capabilities, CLIN structure, and PSC/NAICS alignment |
+
+### Prompt Tools
+
+The three `generate_*` / `analyze_*` tools are **prompt-flow tools** — they assemble rich context (opportunity data, company profile, CID specs, buying history) into structured prompts that the AI model executes as instructions. Each returns a preamble that forces the model to produce a full analysis rather than summarizing.
 
 ### Resources
 
@@ -246,6 +261,7 @@ The MCP (Model Context Protocol) server acts as the **sole data access layer for
 |----------|-------------|
 | Company Profile | SupplyTiger's capabilities, NAICS/PSC codes, acquisition paths |
 | Bid Template | Standard bid response template for context |
+| CID Specs | USDA Commercial Item Descriptions (A-A-20177G, A-A-20001C, A-A-20331B) with scope, salient characteristics, analytical requirements, QA provisions, and packaging |
 
 ### Architecture
 
@@ -268,6 +284,27 @@ The `/chat` page provides an AI-powered procurement intelligence assistant acces
 - **Privacy controls** — conversations can be toggled between private and shared
 - **14-day retention** — conversations auto-expire after 14 days
 - **Persistence** — conversations and messages stored in a separate `chat` schema in PostgreSQL
+
+---
+
+## Document Parsing (Attachments)
+
+Solicitation documents (PDFs, DOCX files) attached to SAM.gov opportunities can be parsed on-demand from the opportunity detail page.
+
+### How It Works
+
+1. **Metadata ingestion** — During opportunity sync, `resourceLinks` (download URLs) are stored. A daily cron job calls the SAM.gov `/resources` endpoint to backfill file metadata (name, size, MIME type, posted date) into the `OpportunityAttachment` table.
+2. **On-demand parsing** — From the opportunity detail page, users click **Parse** on a PDF/DOCX attachment. The backend downloads the file, extracts text via `pdf-parse` (PDF) or `mammoth` (DOCX), and applies section filtering.
+3. **Section extraction** — A 4-tier regex hierarchy extracts only relevant content:
+   - **Tier 1:** Section B (Supplies/Services/CLINs) and Section C (Description/Specs)
+   - **Tier 2:** CLIN blocks (`CLIN 0001`, `CLIN 0002`, etc.)
+   - **Tier 3:** Item description/info/detail and component list patterns
+   - **Tier 4:** Full text fallback if no structure is detected
+4. **Preview-then-save** — Parsed text is returned as a preview. Users review the extracted content and explicitly click **Save** to persist to the database, or **Discard** to throw it away. Already-saved attachments can be re-parsed.
+
+### Size Limit
+
+Files over 10 MB are rejected to avoid memory issues.
 
 ---
 
@@ -331,6 +368,9 @@ All endpoints under `/api/db` and `/api/admin` require authentication via Clerk 
 | GET | `/api/db/opportunities` | READ_ONLY+ | List opportunities |
 | GET | `/api/db/opportunities/:id` | READ_ONLY+ | Get opportunity |
 | DELETE | `/api/db/opportunities/:id` | ADMIN | Hard delete opportunity (preserves multi-parent contact links) |
+| POST | `/api/db/attachments/:id/parse` | READ_ONLY+ | Parse a PDF/DOCX attachment and return extracted text (preview only, not saved) |
+| POST | `/api/db/attachments/:id/save-parsed` | READ_ONLY+ | Save previously parsed text to the database after user review |
+| GET | `/api/db/attachments/:id/text` | READ_ONLY+ | Retrieve saved parsed text for an attachment |
 | GET | `/api/db/awards` | READ_ONLY+ | List awards |
 | GET | `/api/db/awards/:id` | READ_ONLY+ | Get award |
 | DELETE | `/api/db/awards/:id` | ADMIN | Hard delete award |
@@ -387,6 +427,7 @@ All endpoints under `/api/db` and `/api/admin` require authentication via Clerk 
 | GET | `/api/samgov/opportunities/event` | Fetch industry day events |
 | GET | `/api/samgov/opportunities/description/backfill` | Backfill missing descriptions |
 | GET | `/api/samgov/opportunities/:noticeId/description` | Fetch single opportunity description |
+| GET | `/api/samgov/opportunities/attachments/backfill` | Backfill attachment metadata from SAM.gov `/resources` endpoint |
 
 ### USASpending.gov Endpoints (`/api/usaspending`)
 
@@ -411,6 +452,7 @@ Cron jobs run automatically. All jobs write a `SyncLog` entry to the database on
 | Mark Past Industry Days | Daily 12:20 AM EST | Marks industry days with passed event dates |
 | Backfill Opportunity Descriptions | Daily 12:30 AM EST | Fills in missing descriptions from SAM.gov |
 | Sync Industry Days | Daily 12:45 AM EST | Syncs industry day events from SAM.gov |
+| Backfill Attachment Metadata | Daily 1:00 AM EST | Fetches attachment metadata from SAM.gov for opportunities with resource links |
 | Sync USASpending Awards | Every 3 days 1:00 AM EST | Pulls recent contract awards |
 
 **Event-driven jobs:**
@@ -439,6 +481,8 @@ Key models in the Prisma schema:
 | **BuyingOrganization** | Hierarchical agency/office structure |
 | **Contact** + **ContactLink** | Points of contact extracted from opportunities |
 | **Recipient** | Award recipients/contractors (by UEI) |
+| **OpportunityAttachment** | Solicitation documents linked to opportunities (PDF/DOCX metadata, parsed text) |
+| **FederalLogisticsInformationSystem** | DLA Publog/FLIS supply item data (NSN, NIIN, PSC, item descriptions) |
 | **Favorite** | User bookmarks for opportunities and awards |
 | **SyncLog** | History of automated and manual sync job runs |
 | **ChatConversation** | Conversation metadata with expiry tracking (chat schema) |
