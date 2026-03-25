@@ -62,15 +62,20 @@ const ContactsPage = () => {
       render: (val) => val ?? "—",
     },
     {
-      accessor: "title",
-      header: "Title",
-      sortable: true,
+      accessor: "phone",
+      header: "Phone",
       render: (val) => val ?? "—",
     },
     {
       accessor: "buyingOrg",
       header: "Buying Agency",
       render: (_, row) => row.links?.[0]?.buyingOrganization?.name ?? "—",
+    },
+        {
+      accessor: "title",
+      header: "Title",
+      sortable: true,
+      render: (val) => val ?? "—",
     },
     {
       accessor: "status",
