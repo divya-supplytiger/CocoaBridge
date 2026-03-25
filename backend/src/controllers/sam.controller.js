@@ -265,6 +265,7 @@ async function upsertContactsForOpportunity(
         // error handling for unique constraint violation on buyingOrganizationId + externalId
       } catch (upsertErr) {
         if (upsertErr?.code === "P2002" && buyingOrganizationId) {
+          console.log(`[ContactLink] P2002 fallback: updating by buyingOrg+externalId for ${c.externalId}`);
           await db.contactLink.update({
             where: {
               buyingOrganizationId_externalId: {
