@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useLocalStorage } from "../lib/useLocalStorage.js";
 import { useQuery } from "@tanstack/react-query";
 import { dbApi } from "../lib/api.js";
 import Table from "../components/Table.jsx";
@@ -217,7 +218,7 @@ const MarketIntelligencePage = () => {
     { label: "Buying Agencies", value: "buying-orgs" },
     { label: "FLIS Items", value: "flis-items" },
   ];
-  const [activeTab, setActiveTab] = useState(tabs[0].value);
+  const [activeTab, setActiveTab] = useLocalStorage("st:tab:market-intelligence", tabs[0].value);
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);

@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useQuery } from "@tanstack/react-query";
 import { dbApi } from "../lib/api.js";
+import { useLocalStorage } from "../lib/useLocalStorage.js";
 import Table from "../components/Table.jsx";
 import SearchBar from "../components/SearchBar.jsx";
 import FavoriteButton from "../components/FavoriteButton.jsx";
@@ -8,14 +9,13 @@ import TabsJoinButton from "../components/TabsJoinButton.jsx";
 
 const Awards = () => {
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState({ search: "", naics: "", psc: "", favoritesOnly: false });
-  const [sort, setSort] = useState({ field: null, dir: "asc" });
-
   const tabs = [
     { label: "All", value: "all" },
     { label: "Favorites", value: "favorites" },
   ];
-  const [activeTab, setActiveTab] = useState(tabs[0].value);
+  const [activeTab, setActiveTab] = useLocalStorage("st:tab:awards", tabs[0].value);
+  const [filters, setFilters] = useState({ search: "", naics: "", psc: "", favoritesOnly: activeTab === "favorites" });
+  const [sort, setSort] = useState({ field: null, dir: "asc" });
 
   const updateFilter = useCallback((key) => (value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));

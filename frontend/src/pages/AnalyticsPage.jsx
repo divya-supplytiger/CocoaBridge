@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocalStorage } from "../lib/useLocalStorage.js";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { analyticsApi } from "../lib/api.js";
@@ -284,7 +285,7 @@ const AnalyticsPage = () => {
     { label: "By NAICS Code", value: "naics" },
     { label: "By Agency", value: "agencies" },
   ];
-  const [activeTab, setActiveTab] = useState(tabs[0].value);
+  const [activeTab, setActiveTab] = useLocalStorage("st:tab:analytics", tabs[0].value);
 
   return (
   <div className="flex flex-col gap-4">

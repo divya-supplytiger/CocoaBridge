@@ -3,6 +3,7 @@ import { DefaultChatTransport } from "ai";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Send, Square, Info, Bot, FileText, Target, PackageCheck } from "lucide-react";
+import { useLocalStorage } from "../lib/useLocalStorage.js";
 import toast from "react-hot-toast";
 import ChatSidebar from "../components/chat/ChatSidebar.jsx";
 import ChatMessage from "../components/chat/ChatMessage.jsx";
@@ -19,7 +20,7 @@ const ChatPage = () => {
   const queryClient = useQueryClient();
   const messagesEndRef = useRef(null);
   const [activeConversationId, setActiveConversationId] = useState(null);
-  const [selectedModelOverride, setSelectedModel] = useState(null);
+  const [selectedModelOverride, setSelectedModel] = useLocalStorage("st:chat:model", null);
   const [input, setInput] = useState("");
 
   // Refs for dynamic values — transport captures body once, so we use refs + prepareSendMessagesRequest

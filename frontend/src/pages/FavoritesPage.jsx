@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
+import { useLocalStorage } from "../lib/useLocalStorage.js";
 import { useQuery } from "@tanstack/react-query";
 import { dbApi } from "../lib/api.js";
 import Table from "../components/Table.jsx";
@@ -82,11 +83,10 @@ const FavoritesPage = () => {
     { label: "Opportunities", value: "opportunities" },
     { label: "Awards", value: "awards" },
   ];
-  const [activeTab, setActiveTab] = useState(tabs[0].value);
+  const [activeTab, setActiveTab] = useLocalStorage("st:tab:favorites", tabs[0].value);
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
-
   };
 
   const { data, isLoading, isError, error } = useQuery({
