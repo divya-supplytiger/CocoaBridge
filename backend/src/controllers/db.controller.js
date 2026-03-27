@@ -7,6 +7,7 @@ import mammoth from "mammoth";
 
 import { stripHTML } from "../utils/extractSAM.js";
 import { buildInboxTitle } from "../utils/inboxText.js";
+import { writeCsv, fmtDate, fmtCurrency } from "../utils/csv.js";
 
 // pdf-parse v1 is CJS-only
 const require = createRequire(import.meta.url);
@@ -1309,5 +1310,145 @@ export const getAttachmentText = async (req, res) => {
   } catch (error) {
     console.error("getAttachmentText error:", error);
     return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// ---------------------------------------------------------------------------
+// CSV Export Controllers
+// ---------------------------------------------------------------------------
+
+export const exportOpportunities = async (req, res) => {
+  try {
+    const where = {};
+    if (req.query.active !== undefined) where.active = req.query.active === "true";
+    if (req.query.naics) where.naicsCodes = { has: req.query.naics };
+    if (req.query.psc) where.pscCode = { startsWith: req.query.psc, mode: "insensitive" };
+    if (req.query.search) {
+      where.OR = [
+        { title: { contains: req.query.search, mode: "insensitive" } },
+        { description: { contains: req.query.search, mode: "insensitive" } },
+      ];
+    }
+    if (req.query.favoritesOnly === "true") {
+      where.favorites = { some: { userId: req.user.id } };
+    }
+
+    const items = await prisma.opportunity.findMany({
+      where,
+      orderBy: { postedDate: "desc" },
+    });
+
+    const headers = ["Solicitation Number", "Title", "PSC", "NAICS", "Deadline", "Set Aside", "Type", "State", "Active"];
+    const rows = items.map((r) => [
+      r.solicitationNumber,
+      r.title,
+      r.pscCode,
+      r.naicsCodes?.join(", "),
+      fmtDate(r.responseDeadline),
+      r.setAside,
+      r.type,
+      r.state,
+      r.active ? "Yes" : "No",
+    ]);
+    writeCsv(res, "opportunities-export.csv", headers, rows);
+  } catch (error) {
+    console.error("exportOpportunities error:", error);
+    return res.status(500).json({ error: "Internal server error", details: error.message });
+  }
+};
+
+export const exportAwards = async (req, res) => {
+  try {
+    const where = {};
+    if (req.query.naics) where.naicsCodes = { has: req.query.naics };
+    if (req.query.psc) where.pscCode = { startsWith: req.query.psc, mode: "insensitive" };
+    if (req.query.search) where.description = { contains: req.query.search, mode: "insensitive" };
+    if (req.query.favoritesOnly === "true") {
+      where.favorites = { some: { userId: req.user.id } };
+    }
+
+    const items = await prisma.award.findMany({
+      where,
+      orderBy: { startDate: "desc" },
+    });
+
+    const headers = ["Award ID", "Description", "Obligated Amount", "PSC", "NAICS", "Start Date", "End Date"];
+    const rows = items.map((r) => [
+      r.externalId ? r.externalId.split("_")[2] : "",
+      r.description,
+      fmtCurrency(r.obligatedAmount),
+      r.pscCode,
+      r.naicsCodes?.join(", "),
+      fmtDate(r.startDate),
+      fmtDate(r.endDate),
+    ]);
+    writeCsv(res, "awards-export.csv", headers, rows);
+  } catch (error) {
+    console.error("exportAwards error:", error);
+    return res.status(500).json({ error: "Internal server error", details: error.message });
+  }
+};
+
+export const exportContacts = async (req, res) => {
+  try {
+    const where = {};
+    if (req.query.search) {
+      where.OR = [
+        { fullName: { contains: req.query.search, mode: "insensitive" } },
+        { email: { contains: req.query.search, mode: "insensitive" } },
+      ];
+    }
+
+    const items = await prisma.contact.findMany({
+      where,
+      orderBy: { fullName: "asc" },
+      include: {
+        links: {
+          where: { buyingOrganizationId: { not: null } },
+          take: 1,
+          include: { buyingOrganization: { select: { name: true } } },
+        },
+      },
+    });
+
+    const headers = ["Name", "Email", "Phone", "Buying Agency", "Title"];
+    const rows = items.map((r) => [
+      r.fullName,
+      r.email,
+      r.phone,
+      r.links?.[0]?.buyingOrganization?.name,
+      r.title,
+    ]);
+    writeCsv(res, "contacts-export.csv", headers, rows);
+  } catch (error) {
+    console.error("exportContacts error:", error);
+    return res.status(500).json({ error: "Internal server error", details: error.message });
+  }
+};
+
+export const exportInboxItems = async (req, res) => {
+  try {
+    const where = {};
+    if (req.query.status) where.reviewStatus = req.query.status;
+    if (req.query.title) where.opportunity = { title: { contains: req.query.title, mode: "insensitive" } };
+
+    const items = await prisma.inboxItem.findMany({
+      where,
+      include: { opportunity: true, award: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const headers = ["Title", "Type", "Review Status", "Acquisition Path", "Created"];
+    const rows = items.map((r) => [
+      r.title,
+      r.type,
+      r.reviewStatus,
+      r.acquisitionPath,
+      fmtDate(r.createdAt),
+    ]);
+    writeCsv(res, "inbox-items-export.csv", headers, rows);
+  } catch (error) {
+    console.error("exportInboxItems error:", error);
+    return res.status(500).json({ error: "Internal server error", details: error.message });
   }
 };

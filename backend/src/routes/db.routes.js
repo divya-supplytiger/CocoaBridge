@@ -38,6 +38,10 @@ import {
   parseAttachment,
   saveParsedAttachment,
   getAttachmentText,
+  exportOpportunities,
+  exportAwards,
+  exportContacts,
+  exportInboxItems,
 } from "../controllers/db.controller.js";
 
 export const router = express.Router();
@@ -49,6 +53,7 @@ router.get("/ping", ...protectRoute, (_req, res) => res.json({ ok: true }));
 router.get("/me", ...protectRoute, (req, res) => res.json(req.user));
 
 // InboxItems
+router.get("/inbox-items/export", ...protectRoute, readOnlyOrAbove, exportInboxItems);
 router.get("/inbox-items", ...protectRoute, readOnlyOrAbove, listInboxItems);
 router.get("/inbox-items/:id", ...protectRoute, readOnlyOrAbove, getInboxItem);
 router.post("/inbox-items", ...protectRoute, adminOnly, createInboxItem);
@@ -56,6 +61,7 @@ router.patch("/inbox-items/:id", ...protectRoute, adminOnly, updateInboxItem);
 router.delete("/inbox-items/:id", ...protectRoute, adminOnly, deleteInboxItem);
 
 // Opportunities
+router.get("/opportunities/export", ...protectRoute, readOnlyOrAbove, exportOpportunities);
 router.get("/opportunities", ...protectRoute, readOnlyOrAbove, listOpportunities);
 router.get("/opportunities/:id", ...protectRoute, readOnlyOrAbove, getOpportunity);
 router.delete("/opportunities/:id", ...protectRoute, adminOnly, deleteOpportunity);
@@ -66,6 +72,7 @@ router.post("/attachments/:id/save-parsed", ...protectRoute, readOnlyOrAbove, sa
 router.get("/attachments/:id/text", ...protectRoute, readOnlyOrAbove, getAttachmentText);
 
 // Awards
+router.get("/awards/export", ...protectRoute, readOnlyOrAbove, exportAwards);
 router.get("/awards", ...protectRoute, readOnlyOrAbove, listAwards);
 router.get("/awards/:id", ...protectRoute, readOnlyOrAbove, getAward);
 router.delete("/awards/:id", ...protectRoute, adminOnly, deleteAward);
@@ -91,6 +98,7 @@ router.get("/flis-items", ...protectRoute, readOnlyOrAbove, listFLISItems);
 router.get("/flis-items/:id", ...protectRoute, readOnlyOrAbove, getFLISItem);
 
 // Contacts
+router.get("/contacts/export", ...protectRoute, readOnlyOrAbove, exportContacts);
 router.get("/contacts", ...protectRoute, readOnlyOrAbove, listContacts);
 router.get("/contacts/:id", ...protectRoute, readOnlyOrAbove, getContact);
 router.patch("/contacts/:id", ...protectRoute, adminOnly, updateContact);
