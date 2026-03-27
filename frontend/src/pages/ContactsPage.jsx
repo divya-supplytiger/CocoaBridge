@@ -6,6 +6,15 @@ import { dbApi } from "../lib/api.js";
 import { useCurrentUser } from "../lib/CurrentUserContext.jsx";
 import Table from "../components/Table.jsx";
 import SearchBar from "../components/SearchBar.jsx";
+import ExportToolbar from "../components/ExportToolbar.jsx";
+
+const CONTACT_CSV_COLUMNS = [
+  { header: "Name", accessor: "fullName", format: (val) => val ?? "" },
+  { header: "Email", accessor: "email", format: (val) => val ?? "" },
+  { header: "Phone", accessor: "phone", format: (val) => val ?? "" },
+  { header: "Buying Agency", accessor: "buyingOrg", format: (_, row) => row?.links?.[0]?.buyingOrganization?.name ?? "" },
+  { header: "Title", accessor: "title", format: (val) => val ?? "" },
+];
 
 const ContactsPage = () => {
   const currentUser = useCurrentUser();
@@ -16,6 +25,7 @@ const ContactsPage = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sort, setSort] = useState({ field: null, dir: "asc" });
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   const handleSort = useCallback((field) => {
     setSort((prev) => ({
@@ -23,6 +33,7 @@ const ContactsPage = () => {
       dir: prev.field === field && prev.dir === "asc" ? "desc" : "asc",
     }));
     setPage(1);
+    setSelectedIds(new Set());
   }, []);
 
   const { data: result, isLoading, isError, error } = useQuery({
@@ -110,7 +121,15 @@ const ContactsPage = () => {
     <div className="flex flex-col gap-4">
       <SearchBar
         placeholder="Search by name or email..."
-        onSearch={(val) => { setDebouncedSearch(val); setSort({ field: null, dir: "asc" }); setPage(1); }}
+        onSearch={(val) => { setDebouncedSearch(val); setSort({ field: null, dir: "asc" }); setPage(1); setSelectedIds(new Set()); }}
+      />
+      <ExportToolbar
+        selectedIds={selectedIds}
+        data={result?.data ?? []}
+        csvColumns={CONTACT_CSV_COLUMNS}
+        entityName="contacts"
+        exportAllFn={dbApi.exportContacts}
+        filterParams={{ ...(debouncedSearch && { search: debouncedSearch }) }}
       />
       <Table
         columns={columns}
@@ -124,6 +143,9 @@ const ContactsPage = () => {
         basePath="/contacts"
         sort={sort}
         onSort={handleSort}
+        selectable
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
         emptyMessage={debouncedSearch ? "No results found" : "No Contacts"}
         emptySubMessage={debouncedSearch ? `No contacts match "${debouncedSearch}".` : "Contacts will appear here once available."}
       />

@@ -6,8 +6,23 @@ import Table from "../components/Table.jsx";
 import SearchBar from "../components/SearchBar.jsx";
 import FavoriteButton from "../components/FavoriteButton.jsx";
 import TabsJoinButton from "../components/TabsJoinButton.jsx";
+import ExportToolbar from "../components/ExportToolbar.jsx";
+
+const OPP_CSV_COLUMNS = [
+  { header: "Solicitation Number", accessor: "solicitationNumber", format: (val) => val ?? "" },
+  { header: "Title", accessor: "title" },
+  { header: "PSC", accessor: "pscCode", format: (val) => val ?? "" },
+  { header: "NAICS", accessor: "naicsCodes", format: (val) => val?.join(", ") ?? "" },
+  { header: "Deadline", accessor: "responseDeadline", format: (val) => val ? new Date(val).toLocaleDateString() : "" },
+  { header: "Set Aside", accessor: "setAside", format: (val) => val ?? "" },
+  { header: "Type", accessor: "type", format: (val) => val ?? "" },
+  { header: "State", accessor: "state", format: (val) => val ?? "" },
+  { header: "Active", accessor: "active", format: (val) => val ? "Yes" : "No" },
+];
+
 const Opportunities = () => {
   const [page, setPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const tabs = [
     { label: "All", value: "all" },
     { label: "Favorites", value: "favorites" },
@@ -20,6 +35,7 @@ const Opportunities = () => {
     setFilters((prev) => ({ ...prev, [key]: value }));
     setSort({ field: null, dir: "asc" });
     setPage(1);
+    setSelectedIds(new Set());
   }, []);
 
   const handleSort = useCallback((field) => {
@@ -28,12 +44,14 @@ const Opportunities = () => {
       dir: prev.field === field && prev.dir === "asc" ? "desc" : "asc",
     }));
     setPage(1);
+    setSelectedIds(new Set());
   }, []);
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     setFilters((prev) => ({ ...prev, favoritesOnly: tab === "favorites" }));
     setPage(1);
+    setSelectedIds(new Set());
   };
 
   const { data: result, isLoading, isError, error } = useQuery({
@@ -119,6 +137,19 @@ const Opportunities = () => {
         <SearchBar onSearch={updateFilter("naics")} placeholder="NAICS code…" className="max-w-[180px]" />
         <SearchBar onSearch={updateFilter("psc")} placeholder="PSC prefix…" className="max-w-[160px]" />
       </div>
+      <ExportToolbar
+        selectedIds={selectedIds}
+        data={result?.data ?? []}
+        csvColumns={OPP_CSV_COLUMNS}
+        entityName="opportunities"
+        exportAllFn={dbApi.exportOpportunities}
+        filterParams={{
+          ...(filters.search && { search: filters.search }),
+          ...(filters.naics && { naics: filters.naics }),
+          ...(filters.psc && { psc: filters.psc }),
+          ...(filters.favoritesOnly && { favoritesOnly: true }),
+        }}
+      />
       <Table
         columns={columns}
         data={result?.data ?? []}
@@ -131,6 +162,9 @@ const Opportunities = () => {
         basePath="/opportunities"
         sort={sort}
         onSort={handleSort}
+        selectable
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
         emptyMessage={filters.favoritesOnly ? "No favorited opportunities" : undefined}
         emptySubMessage={filters.favoritesOnly ? "Star an opportunity to save it here." : undefined}
       />

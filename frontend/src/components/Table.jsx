@@ -3,10 +3,31 @@ import { ChevronUp, ChevronDown } from 'lucide-react';
 import PaginationButton from './PaginationButton.jsx';
 import Row from "./Row.jsx";
 
-const Table = ({ isLoading, isError, error, data, columns, meta, page, onPageChange, basePath, emptyMessage, emptySubMessage, sort, onSort }) => {
+const Table = ({ isLoading, isError, error, data, columns, meta, page, onPageChange, basePath, emptyMessage, emptySubMessage, sort, onSort, selectable, selectedIds, onSelectionChange }) => {
   const navigate = useNavigate();
   const totalPages = meta ? Math.ceil(meta.total / meta.limit) : 1;
   const showPagination = meta && meta.total > meta.limit;
+
+  const allOnPageSelected = selectable && data?.length > 0 && data.every((row) => selectedIds?.has(row.id));
+
+  const handleSelectAll = () => {
+    if (!onSelectionChange) return;
+    const next = new Set(selectedIds);
+    if (allOnPageSelected) {
+      for (const row of data) next.delete(row.id);
+    } else {
+      for (const row of data) next.add(row.id);
+    }
+    onSelectionChange(next);
+  };
+
+  const handleSelectRow = (id) => {
+    if (!onSelectionChange) return;
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    onSelectionChange(next);
+  };
 
   return (
     <div className="card bg-base-100 text-accent-content shadow-md">
@@ -31,6 +52,16 @@ const Table = ({ isLoading, isError, error, data, columns, meta, page, onPageCha
               <table className="table">
                 <thead>
                   <tr>
+                    {selectable && (
+                      <th className="w-10">
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-sm"
+                          checked={allOnPageSelected}
+                          onChange={handleSelectAll}
+                        />
+                      </th>
+                    )}
                     {columns.map((col) => (
                       <th
                         key={col.accessor}
@@ -53,6 +84,17 @@ const Table = ({ isLoading, isError, error, data, columns, meta, page, onPageCha
                       key={row.id}
                       onClick={basePath ? () => navigate(`${basePath}/${row.id}`) : undefined}
                     >
+                      {selectable && (
+                        <td>
+                          <input
+                            type="checkbox"
+                            className="checkbox checkbox-sm"
+                            checked={selectedIds?.has(row.id) ?? false}
+                            onChange={() => handleSelectRow(row.id)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </td>
+                      )}
                       {columns.map((col) => (
                         <td key={col.accessor}>
                           {col.render ? col.render(row[col.accessor], row) : row[col.accessor]}
@@ -70,7 +112,7 @@ const Table = ({ isLoading, isError, error, data, columns, meta, page, onPageCha
                 onPageChange={onPageChange}
               />
             )}
-                 
+
           </>
         )}
       </div>

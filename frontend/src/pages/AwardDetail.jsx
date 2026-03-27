@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Inbox } from "lucide-react";
+import { Trash2, Inbox, FileDown } from "lucide-react";
 import toast from "react-hot-toast";
 import { dbApi } from "../lib/api.js";
 import { useCurrentUser } from "../lib/CurrentUserContext.jsx";
 import ItemDetail from "../components/ItemDetail.jsx";
 import AddToInboxModal from "../components/AddToInboxModal.jsx";
 import FavoriteButton from "../components/FavoriteButton.jsx";
+import { exportDetailToCsv, csvFilename } from "../lib/csvExport.js";
 
 const AwardDetail = () => {
   const { id } = useParams();
@@ -96,6 +97,23 @@ const AwardDetail = () => {
         {item && (
           <div className="flex justify-end gap-2">
             <FavoriteButton entityType="award" entityId={id} isFavorited={isFavorited} />
+              <button
+                className="btn btn-secondary btn-sm gap-1"
+                onClick={() => exportDetailToCsv([
+                  { label: "Description", value: item.description },
+                  { label: "Award ID", value: item.externalId?.split("_")[2] },
+                  { label: "Recipient", value: item.recipient?.name },
+                  { label: "Agency", value: item.buyingOrganization?.name },
+                  { label: "Amount", value: item.obligatedAmount != null ? `$${Number(item.obligatedAmount).toLocaleString()}` : "" },
+                  { label: "NAICS", value: item.naicsCodes?.join(", ") },
+                  { label: "PSC", value: item.pscCode },
+                  { label: "Start Date", value: item.startDate ? new Date(item.startDate).toLocaleDateString() : "" },
+                  { label: "End Date", value: item.endDate ? new Date(item.endDate).toLocaleDateString() : "" },
+                ], csvFilename("award", id))}
+              >
+                <FileDown className="size-4" />
+                Export
+              </button>
             {hasReadAccess && (
               <>
                 {item.inboxItems?.length > 0 ? (

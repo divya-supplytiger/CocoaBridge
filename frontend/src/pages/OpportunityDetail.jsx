@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Inbox, FileText, Download, ScanSearch, Eye } from "lucide-react";
+import { Trash2, Inbox, FileText, Download, ScanSearch, Eye, FileDown } from "lucide-react";
 import toast from "react-hot-toast";
 import { dbApi } from "../lib/api.js";
 import { useCurrentUser } from "../lib/CurrentUserContext.jsx";
@@ -10,6 +10,7 @@ import RelatedRecordsCard from "../components/RelatedRecordsCard.jsx";
 import AddToInboxModal from "../components/AddToInboxModal.jsx";
 import FavoriteButton from "../components/FavoriteButton.jsx";
 import ParsedTextModal from "../components/ParsedTextModal.jsx";
+import { exportDetailToCsv, csvFilename } from "../lib/csvExport.js";
 
 const PARSEABLE_TYPES = [".pdf", ".docx"];
 const isParseable = (att) => {
@@ -106,6 +107,25 @@ const OpportunityDetail = () => {
           {item && (
             <div className="flex justify-end gap-2">
               <FavoriteButton entityType="opportunity" entityId={id} isFavorited={isFavorited} />
+              <button
+                className="btn btn-secondary btn-sm gap-1"
+                onClick={() => exportDetailToCsv([
+                  { label: "Title", value: item.title },
+                  { label: "Solicitation Number", value: item.solicitationNumber },
+                  { label: "Agency", value: item.buyingOrganization?.name },
+                  { label: "Type", value: item.type },
+                  { label: "Active", value: item.active ? "Yes" : "No" },
+                  { label: "NAICS", value: item.naicsCodes?.join(", ") },
+                  { label: "PSC", value: item.pscCode },
+                  { label: "Posted", value: item.postedDate ? new Date(item.postedDate).toLocaleDateString() : "" },
+                  { label: "Deadline", value: item.responseDeadline ? new Date(item.responseDeadline).toLocaleDateString() : "" },
+                  { label: "Set Aside", value: item.setAside },
+                  { label: "State", value: item.state },
+                ], csvFilename("opportunity", id))}
+              >
+                <FileDown className="size-4" />
+                Export
+              </button>
               {hasReadAccess && (
                 <>
                   {item.inboxItems?.length > 0 ? (

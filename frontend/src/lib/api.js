@@ -136,6 +136,12 @@ export const dbApi = {
     const { data } = await axiosInstance.post("/db/favorites", { entityType, entityId });
     return data;
   },
+
+  // CSV Exports
+  exportOpportunities: (params) => axiosInstance.get("/db/opportunities/export", { params, responseType: "blob" }),
+  exportAwards: (params) => axiosInstance.get("/db/awards/export", { params, responseType: "blob" }),
+  exportContacts: (params) => axiosInstance.get("/db/contacts/export", { params, responseType: "blob" }),
+  exportInboxItems: (params) => axiosInstance.get("/db/inbox-items/export", { params, responseType: "blob" }),
 };
 
 export const analyticsApi = {

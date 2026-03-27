@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+import { Trash2, FileDown } from "lucide-react";
 import toast from "react-hot-toast";
 import { dbApi } from "../lib/api.js";
 import { useCurrentUser } from "../lib/CurrentUserContext.jsx";
 import ItemDetail from "../components/ItemDetail.jsx";
 import RelatedRecordsCard from "../components/RelatedRecordsCard.jsx";
+import { exportDetailToCsv, csvFilename } from "../lib/csvExport.js";
 
 // Deduplicate ContactLink rows by the linked entity's own id.
 // The same entity can appear multiple times (once per contact role —
@@ -111,6 +112,23 @@ const ContactDetail = () => {
           badges={badges}
           fields={fields}
         >
+          {item && (
+            <div className="flex justify-end mb-2">
+              <button
+                className="btn btn-secondary btn-sm gap-1"
+                onClick={() => exportDetailToCsv([
+                  { label: "Name", value: item.fullName },
+                  { label: "Email", value: item.email },
+                  { label: "Phone", value: item.phone },
+                  { label: "Title", value: item.title },
+                  { label: "Buying Agency", value: item.links?.[0]?.buyingOrganization?.name },
+                ], csvFilename("contact", id))}
+              >
+                <FileDown className="size-4" />
+                Export
+              </button>
+            </div>
+          )}
           {isAdmin && item && (
             <div className="flex flex-col gap-3">
               <p className="text-sm font-semibold">Edit Contact</p>

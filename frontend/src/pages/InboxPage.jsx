@@ -6,6 +6,15 @@ import { dbApi } from "../lib/api.js";
 import { useCurrentUser } from "../lib/CurrentUserContext.jsx";
 import Table from "../components/Table.jsx";
 import SearchBar from '../components/SearchBar.jsx';
+import ExportToolbar from "../components/ExportToolbar.jsx";
+
+const INBOX_CSV_COLUMNS = [
+  { header: "Title", accessor: "title", format: (val) => val ?? "" },
+  { header: "Type", accessor: "type", format: (val) => val ?? "" },
+  { header: "Review Status", accessor: "reviewStatus", format: (val) => val ?? "" },
+  { header: "Acquisition Path", accessor: "acquisitionPath", format: (val) => val ?? "" },
+  { header: "Created", accessor: "createdAt", format: (val) => val ? new Date(val).toLocaleDateString() : "" },
+];
 const STATUS_BADGE = {
   NEW: "badge-neutral",
   IN_REVIEW: "badge-warning",
@@ -22,6 +31,7 @@ const InboxPage = () => {
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sort, setSort] = useState({ field: null, dir: "asc" });
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   const handleSort = useCallback((field) => {
     setSort((prev) => ({
@@ -29,6 +39,7 @@ const InboxPage = () => {
       dir: prev.field === field && prev.dir === "asc" ? "desc" : "asc",
     }));
     setPage(1);
+    setSelectedIds(new Set());
   }, []);
 
   const currentUser = useCurrentUser();
@@ -121,9 +132,17 @@ const InboxPage = () => {
     <div className="flex flex-col gap-4">
       <SearchBar
         placeholder="Search by title..."
-        onSearch={(val) => { setDebouncedSearch(val); setSort({ field: null, dir: "asc" }); setPage(1); }}
+        onSearch={(val) => { setDebouncedSearch(val); setSort({ field: null, dir: "asc" }); setPage(1); setSelectedIds(new Set()); }}
       />
 
+      <ExportToolbar
+        selectedIds={selectedIds}
+        data={result?.data ?? []}
+        csvColumns={INBOX_CSV_COLUMNS}
+        entityName="inbox-items"
+        exportAllFn={dbApi.exportInboxItems}
+        filterParams={{ ...(debouncedSearch && { title: debouncedSearch }) }}
+      />
       <Table
         columns={columns}
         data={result?.data ?? []}
@@ -136,6 +155,9 @@ const InboxPage = () => {
         basePath="/inbox"
         sort={sort}
         onSort={handleSort}
+        selectable
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
       />
 
       {pendingDeleteId && (

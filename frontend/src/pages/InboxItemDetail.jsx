@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Trophy, Handshake } from "lucide-react";
+import { Trash2, Trophy, Handshake, FileDown } from "lucide-react";
 import toast from "react-hot-toast";
 import { dbApi } from "../lib/api.js";
 import { useCurrentUser } from "../lib/CurrentUserContext.jsx";
 import ItemDetail from "../components/ItemDetail.jsx";
+import { exportDetailToCsv, csvFilename } from "../lib/csvExport.js";
 
 const STATUS_BADGE = {
   NEW: "badge-neutral",
@@ -109,6 +110,22 @@ const InboxItemDetail = () => {
                 </div>
               )}
               <div className="flex gap-2 ml-auto">
+                <button
+                  className="btn btn-secondary btn-sm gap-1"
+                  onClick={() => exportDetailToCsv([
+                    { label: "Title", value: item.title },
+                    { label: "Type", value: item.type },
+                    { label: "Review Status", value: item.reviewStatus },
+                    { label: "Acquisition Path", value: item.acquisitionPath },
+                    { label: "Source", value: item.source },
+                    { label: "Tag", value: item.tag },
+                    { label: "Reviewed By", value: item.reviewedBy },
+                    { label: "Created", value: item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "" },
+                  ], csvFilename("inbox-item", id))}
+                >
+                  <FileDown className="size-4" />
+                  Export
+                </button>
                 {item.opportunity && (
                   <Link to={`/opportunities/${item.opportunity.id}`} className="btn btn-primary btn-sm">
                     <Handshake className="size-4" />
