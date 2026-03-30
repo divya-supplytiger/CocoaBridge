@@ -1,3 +1,7 @@
+// Client-side CSV export utilities.
+
+// These mirror the backend's csv.js functions but generate the CSV content in-memory
+// useful for exporting selected rows or detail fields without needing a server round-trip.
 function escapeCsv(val) {
   const str = String(val ?? "");
   return str.includes(",") || str.includes('"') || str.includes("\n")

@@ -7,7 +7,15 @@ import mammoth from "mammoth";
 
 import { stripHTML } from "../utils/extractSAM.js";
 import { buildInboxTitle } from "../utils/inboxText.js";
-import { writeCsv, fmtDate, fmtCurrency } from "../utils/csv.js";
+import {
+  writeCsv,
+  fmtDate,
+  fmtCurrency,
+  extractRelevantSections,
+  resolveFileExtension,
+  MAX_PARSE_SIZE,
+  SUPPORTED_PARSE_TYPES,
+} from "../utils/csv.js";
 
 // pdf-parse v1 is CJS-only
 const require = createRequire(import.meta.url);
@@ -1148,58 +1156,6 @@ export const toggleFavorite = async (req, res) => {
 };
 
 // ---------- Attachment parsing (Step Two) ----------
-
-const MAX_PARSE_SIZE = 10 * 1024 * 1024; // 10MB
-const SUPPORTED_PARSE_TYPES = [".pdf", ".docx"];
-
-/**
- * Extract only relevant sections from solicitation text.
- * Keeps: Section B (CLINs/prices), Section C (item description/components/tables).
- * Falls back to CLIN blocks, item description patterns, or full text.
- */
-function extractRelevantSections(rawText) {
-  const sections = [];
-
-  // Try to extract Section B (Supplies/Services, CLINs)
-  const sectionBMatch = rawText.match(
-    /SECTION\s+B[\s\S]*?(?=SECTION\s+[C-Z]|$)/i,
-  );
-  if (sectionBMatch) sections.push(sectionBMatch[0].trim());
-
-  // Try to extract Section C (Description/Specs/Item Info)
-  const sectionCMatch = rawText.match(
-    /SECTION\s+C[\s\S]*?(?=SECTION\s+[D-Z]|$)/i,
-  );
-  if (sectionCMatch) sections.push(sectionCMatch[0].trim());
-
-  // If no section headers found, try CLIN-based extraction
-  if (sections.length === 0) {
-    const clinBlocks = rawText.match(
-      /CLIN\s+\d{4}[\s\S]*?(?=CLIN\s+\d{4}|SECTION|$)/gi,
-    );
-    if (clinBlocks) sections.push(...clinBlocks.map((b) => b.trim()));
-  }
-
-  // If still nothing, try item description / item info / component patterns
-  if (sections.length === 0) {
-    const itemMatches = rawText.match(
-      /(?:ITEM\s+(?:DESCRIPTION|INFO(?:RMATION)?|DETAIL(?:S)?)|COMPONENT\s+(?:LIST|DESCRIPTION|DETAIL(?:S)?))[\s\S]*?(?=PACKAGING|INSPECTION|QUALITY|DELIVERY|SECTION|$)/gi,
-    );
-    if (itemMatches) sections.push(...itemMatches.map((m) => m.trim()));
-  }
-
-  // Fallback: return cleaned full text if no structure detected
-  const result =
-    sections.length > 0 ? sections.join("\n\n---\n\n") : rawText;
-
-  return result.replace(/\n{3,}/g, "\n\n").trim();
-}
-
-function resolveFileExtension(attachment) {
-  if (attachment.mimeType) return attachment.mimeType.toLowerCase();
-  const match = attachment.name?.match(/\.\w+$/);
-  return match ? match[0].toLowerCase() : "";
-}
 
 // Preview only — downloads, extracts, returns text but does NOT save to DB
 export const parseAttachment = async (req, res) => {

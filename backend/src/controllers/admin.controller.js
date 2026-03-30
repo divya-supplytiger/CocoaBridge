@@ -14,11 +14,13 @@ import { loadFilterConfig, VALID_CONFIG_KEYS } from "../utils/filterConfig.js";
  * @param {Function} countFn - optional function to extract recordsAffected from result
  */
 export async function withSyncLog(jobId, jobName, fn, countFn = null, failFn = null) {
+  // Create a log entry with status RUNNING before starting the job.
   const log = await prisma.syncLog.create({
     data: { jobId, jobName, status: "RUNNING" },
   });
 
   try {
+    // Run the sync function and capture the result.
     const result = await fn();
     const recordsAffected = countFn ? countFn(result) : null;
     const partialError = failFn ? failFn(result) : null;
@@ -50,6 +52,7 @@ export async function withSyncLog(jobId, jobName, fn, countFn = null, failFn = n
 // ─── User management ─────────────────────────────────────────────────────────
 
 export const listUsers = async (req, res) => {
+  // List all users with basic info; used in admin user management UI.
   try {
     const users = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
@@ -82,9 +85,12 @@ export const updateUser = async (req, res) => {
   }
 
   const data = {};
+  // Only include fields that were provided in the request body
   if (role !== undefined) data.role = role;
+  // isActive can be true or false, so we check for undefined to allow setting false
   if (isActive !== undefined) data.isActive = isActive;
 
+  // If no valid fields were provided, return an error
   if (Object.keys(data).length === 0) {
     return res.status(400).json({ message: "No fields to update" });
   }
@@ -105,6 +111,7 @@ export const updateUser = async (req, res) => {
     });
     return res.json(user);
   } catch (error) {
+    // Handle case where user with given ID does not exist
     if (error.code === "P2025") {
       return res.status(404).json({ message: "User not found" });
     }
@@ -128,6 +135,7 @@ const KNOWN_JOBS = [
 export const getSystemHealth = async (req, res) => {
   try {
     const results = await Promise.all(
+      // For each known job, fetch the most recent log entry to report last run time and status.  
       KNOWN_JOBS.map(({ jobId, jobName }) =>
         prisma.syncLog
           .findFirst({
@@ -154,6 +162,7 @@ const SYNC_JOBS = {
   "sam-opportunities": {
     jobId: "sync-current-sam-opportunities",
     jobName: "Sync SAM Opportunities",
+    // The fn should return an object that countFn and failFn can use to determine records affected and any partial errors. 
     fn: () => runCurrentOpportunitiesSyncFromSam(),
     countFn: (r) => r?.db?.upserted ?? null,
     failFn: (r) => {
