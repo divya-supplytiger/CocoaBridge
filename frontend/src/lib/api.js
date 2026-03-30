@@ -62,6 +62,11 @@ export const dbApi = {
     const { data } = await axiosInstance.delete(`/db/awards/${id}`);
     return data;
   },
+  // Calendar
+  listCalendarEvents: async (params) => {
+    const { data } = await axiosInstance.get("/db/calendar-events", { params });
+    return data;
+  },
   // Industry Days
   listIndustryDays: async (params) => {
     const { data } = await axiosInstance.get("/db/industry-days", { params });

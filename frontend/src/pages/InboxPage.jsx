@@ -32,8 +32,7 @@ const InboxPage = () => {
   // pendingDeleteId is the id of the item we're currently confirming deletion for (null if not confirming any)
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [debouncedSearch, setDebouncedSearch] = useState("");
-
-
+  const [statusFilter, setStatusFilter] = useState("");
   const [sort, setSort] = useState({ field: null, dir: "asc" });
   const [selectedIds, setSelectedIds] = useState(new Set());
 
@@ -51,11 +50,12 @@ const InboxPage = () => {
   const queryClient = useQueryClient();
 
   const { data: result, isLoading, isError, error } = useQuery({
-    queryKey: ["inboxItems", page, debouncedSearch, sort],
+    queryKey: ["inboxItems", page, debouncedSearch, statusFilter, sort],
     queryFn: () => dbApi.listInboxItems({
       page,
       limit: 50,
       ...(debouncedSearch && { title: debouncedSearch }),
+      ...(statusFilter && { status: statusFilter }),
       ...(sort.field && { sortBy: sort.field, sortDir: sort.dir }),
     }),
   });
@@ -134,10 +134,22 @@ const InboxPage = () => {
 
   return (
     <div className="flex flex-col gap-4">
-      <SearchBar
-        placeholder="Search by title..."
-        onSearch={(val) => { setDebouncedSearch(val); setSort({ field: null, dir: "asc" }); setPage(1); setSelectedIds(new Set()); }}
-      />
+      <div className="flex items-center gap-2">
+        <SearchBar
+          placeholder="Search by title..."
+          onSearch={(val) => { setDebouncedSearch(val); setSort({ field: null, dir: "asc" }); setPage(1); setSelectedIds(new Set()); }}
+        />
+        <select
+          className="select select-bordered select-sm"
+          value={statusFilter}
+          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); setSelectedIds(new Set()); }}
+        >
+          <option value="">All Statuses</option>
+          {STATUSES.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+      </div>
 
       <ExportToolbar
         selectedIds={selectedIds}
