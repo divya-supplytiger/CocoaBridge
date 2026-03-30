@@ -148,7 +148,7 @@ const CalendarPage = () => {
             meta={industryResult?.meta}
             page={page}
             onPageChange={setPage}
-            basePath="/industry-days"
+            basePath="/industry-day"
             emptyMessage="No Industry Days"
             emptySubMessage="Industry days will appear here once available."
           />

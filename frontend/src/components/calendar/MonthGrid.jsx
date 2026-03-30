@@ -17,7 +17,7 @@ function eventBadgeClass(event) {
 function eventPath(event) {
   return event.type === "deadline"
     ? `/opportunities/${event.relatedId}`
-    : `/industry-days/${event.relatedId}`;
+    : `/industry-day/${event.relatedId}`;
 }
 
 const MonthGrid = ({ events = [], month, year, onPrev, onNext, isLoading }) => {
