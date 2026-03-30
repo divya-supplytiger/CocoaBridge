@@ -794,12 +794,15 @@ export const getIndustryDay = async (req, res) => {
 
 export const updateIndustryDay = async (req, res) => {
   try {
-    const { status } = req.body;
-    if (!status) return res.status(400).json({ error: "status is required" });
+    const { status, summary } = req.body;
+    const data = {};
+    if (status !== undefined) data.status = status;
+    if (summary !== undefined) data.summary = summary;
+    if (Object.keys(data).length === 0) return res.status(400).json({ error: "No updatable fields provided" });
 
     const item = await prisma.industryDay.update({
       where: { id: req.params.id },
-      data: { status },
+      data,
     });
     return res.json({ data: item });
   } catch (error) {
