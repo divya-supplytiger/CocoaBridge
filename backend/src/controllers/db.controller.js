@@ -69,14 +69,10 @@ const upsertUserFromClerk = async ({
   });
 
   if (existingByClerkId) {
+    // Never overwrite a manually-set role — only sync profile fields
     return prisma.user.update({
       where: { clerkId },
-      data: {
-        email,
-        name,
-        imageUrl,
-        role,
-      },
+      data: { email, name, imageUrl },
     });
   }
 
@@ -85,26 +81,16 @@ const upsertUserFromClerk = async ({
   });
 
   if (existingByEmail) {
+    // Linking an existing email-based account to Clerk — preserve the stored role
     return prisma.user.update({
       where: { id: existingByEmail.id },
-      data: {
-        clerkId,
-        email,
-        name,
-        imageUrl,
-        role,
-      },
+      data: { clerkId, email, name, imageUrl },
     });
   }
 
+  // Brand new user — assign role from ADMIN_EMAILS
   return prisma.user.create({
-    data: {
-      clerkId,
-      email,
-      name,
-      imageUrl,
-      role,
-    },
+    data: { clerkId, email, name, imageUrl, role },
   });
 };
 

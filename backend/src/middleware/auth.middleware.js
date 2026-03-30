@@ -1,6 +1,7 @@
-import { requireAuth } from "@clerk/express";
+import { requireAuth, clerkClient } from "@clerk/express";
 import { UserRole } from "@prisma/client";
 import prisma from "../config/db.js";
+import { ENV } from "../config/env.js";
 
 export const protectRoute = [
   requireAuth(),
@@ -13,13 +14,37 @@ export const protectRoute = [
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { clerkId },
-      });
+      let user = await prisma.user.findUnique({ where: { clerkId } });
+
+      // Race condition guard: Inngest may not have synced the user yet on first login.
+      // Lazily create them from the Clerk API so the first request doesn't 401.
       if (!user) {
-        return res.status(401).json({
-          message: "Unauthorized: User not found",
-        });
+        try {
+          const clerkUser = await clerkClient.users.getUser(clerkId);
+          const emailAddresses = clerkUser.emailAddresses ?? [];
+          const primaryEmail =
+            emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId)
+            ?? emailAddresses[0];
+          const email = primaryEmail?.emailAddress ?? null;
+          if (email) {
+            const firstName = clerkUser.firstName ?? null;
+            const lastName = clerkUser.lastName ?? null;
+            const name = [firstName, lastName].filter(Boolean).join(" ").trim() || "Unnamed User";
+            const imageUrl = clerkUser.imageUrl ?? null;
+            const role = ENV.ADMIN_EMAILS.includes(email.toLowerCase()) ? UserRole.ADMIN : UserRole.USER;
+            user = await prisma.user.upsert({
+              where: { clerkId },
+              create: { clerkId, email, name, imageUrl, role },
+              update: { email, name, imageUrl },
+            });
+          }
+        } catch (syncErr) {
+          console.error("protectRoute: failed to lazily create user", syncErr?.message);
+        }
+      }
+
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized: User not found" });
       }
 
       if (!user.isActive) {
