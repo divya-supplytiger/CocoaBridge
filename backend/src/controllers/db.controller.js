@@ -356,9 +356,10 @@ export const runBackfillOpportunityAttachments = async ({
         data?._embedded?.opportunityAttachmentList?.[0]?.attachments ?? [];
       fetched += 1;
 
-      // Filter to public attachments only
+      // Filter to public file attachments only — exclude link-type resources
+      // which pass fileExists === "1" but are not downloadable files
       const publicAttachments = attachments.filter(
-        (a) => a.accessLevel === "public" && a.fileExists === "1",
+        (a) => a.accessLevel === "public" && a.fileExists === "1" && a.type !== "link",
       );
 
       for (const att of publicAttachments) {
@@ -635,6 +636,7 @@ export const getOpportunity = async (req, res) => {
             downloadUrl: true,
             parsedAt: true,
           },
+          where: { mimeType: { not: null } },
         },
       },
     });

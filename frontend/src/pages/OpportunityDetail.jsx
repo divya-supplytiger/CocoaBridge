@@ -224,14 +224,16 @@ const OpportunityDetail = () => {
                                   : <><ScanSearch className="size-4" /> Parse</>}
                               </button>
                             )}
-                            <a
-                              href={att.downloadUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="btn btn-ghost btn-xs"
-                            >
-                              <Download className="size-4" />
-                            </a>
+                            {att.mimeType && (
+                              <a
+                                href={att.downloadUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-ghost btn-xs"
+                              >
+                                <Download className="size-4" />
+                              </a>
+                            )}
                           </td>
                         </tr>
                       );
