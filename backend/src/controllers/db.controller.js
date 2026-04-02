@@ -641,6 +641,7 @@ export const getOpportunity = async (req, res) => {
       include: {
         buyingOrganization: true,
         inboxItems: true,
+        scoringQueue: { select: { id: true, status: true } },
         contactLinks: {
           include: { contact: { select: { id: true } } },
         },
@@ -1136,6 +1137,7 @@ export const listFLISItems = async (req, res) => {
         { itemName: { contains: req.query.search, mode: "insensitive" } },
         { commonName: { contains: req.query.search, mode: "insensitive" } },
         { characteristics: { contains: req.query.search, mode: "insensitive" } },
+        { nsn: { contains: req.query.search, mode: "insensitive" } },
       ];
     }
     if (req.query.supplyTigerOnly === "true") {

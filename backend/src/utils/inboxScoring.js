@@ -9,16 +9,14 @@ import { CORE_PSC, CORE_NAICS, FLIS_PSC, classificationPrefixes, naicsPrefixes, 
 const NSN_REGEX = /\b\d{4}-\d{2}-\d{3}-\d{4}\b/g;
 
 /**
- * Score an opportunity against its attachments and metadata using FLIS-based signal matching.
- * Returns { score, matchedSignals, parsedTexts }.
+ * Score an opportunity using only metadata signals (NAICS, PSC, agency history, deadline, keywords).
+ * No attachment parsing or FLIS lookups. Used for manual scoring preview and as the base layer
+ * for the full pipeline.
+ * Returns { score, matchedSignals }.
  */
-export async function scoreOpportunityForInbox(opportunity, flisItems, filterConfig) {
+export async function scoreOpportunityMetadata(opportunity, filterConfig) {
   const matchedSignals = [];
   let score = 0;
-
-  const flisItemNames = flisItems.map(f => f.itemName?.toLowerCase()).filter(Boolean);
-  const flisCommonNames = flisItems.map(f => f.commonName?.toLowerCase()).filter(Boolean);
-  const flisNsnSet = new Set(flisItems.map(f => f.nsn));
 
   const metaText = [opportunity.title ?? "", opportunity.description ?? ""].join(" ");
 
@@ -90,6 +88,24 @@ export async function scoreOpportunityForInbox(opportunity, flisItems, filterCon
     score += 2;
     matchedSignals.push({ type: "KEYWORD", value: kw, source: "title" });
   }
+
+  return { score, matchedSignals };
+}
+
+/**
+ * Score an opportunity against its attachments and metadata using FLIS-based signal matching.
+ * Returns { score, matchedSignals, parsedTexts }.
+ */
+export async function scoreOpportunityForInbox(opportunity, flisItems, filterConfig) {
+  const { score: metaScore, matchedSignals } = await scoreOpportunityMetadata(opportunity, filterConfig);
+  let score = metaScore;
+
+  const flisItemNames = flisItems.map(f => f.itemName?.toLowerCase()).filter(Boolean);
+  const flisCommonNames = flisItems.map(f => f.commonName?.toLowerCase()).filter(Boolean);
+  const flisNsnSet = new Set(flisItems.map(f => f.nsn));
+
+  const metaText = [opportunity.title ?? "", opportunity.description ?? ""].join(" ");
+  const metaLower = metaText.toLowerCase();
 
   // Parse attachments
   const parsedTexts = [];

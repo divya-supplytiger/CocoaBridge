@@ -1,6 +1,6 @@
 import express from "express";
 import { protectRoute, adminOnly, readOnlyOrAbove } from "../middleware/auth.middleware.js";
-import { scoringQueueRouter } from "./scoringQueue.routes.js";
+import { scoringQueueRouter, manualScoreRouter } from "./scoringQueue.routes.js";
 import {
   getRecipientAnalytics,
   getPscAnalytics,
@@ -70,6 +70,7 @@ router.get("/opportunities/export", ...protectRoute, readOnlyOrAbove, exportOppo
 router.get("/opportunities", ...protectRoute, readOnlyOrAbove, listOpportunities);
 router.get("/opportunities/:id", ...protectRoute, readOnlyOrAbove, getOpportunity);
 router.delete("/opportunities/:id", ...protectRoute, adminOnly, deleteOpportunity);
+router.use("/opportunities/:id", manualScoreRouter);
 
 // Attachment parsing (PDF/DOCX text extraction)
 router.post("/attachments/:id/parse", ...protectRoute, readOnlyOrAbove, parseAttachment);
