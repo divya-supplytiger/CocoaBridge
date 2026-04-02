@@ -397,6 +397,8 @@ All endpoints under `/api/db` and `/api/admin` require authentication via Clerk 
 | GET | `/api/db/opportunities` | READ_ONLY+ | List opportunities |
 | GET | `/api/db/opportunities/:id` | READ_ONLY+ | Get opportunity |
 | DELETE | `/api/db/opportunities/:id` | ADMIN | Hard delete opportunity (preserves multi-parent contact links) |
+| GET | `/api/db/opportunities/:id/manual-score/preview` | ADMIN | Run the metadata scoring layer and return `metadataScore` + `metadataSignals` for the manual score modal |
+| POST | `/api/db/opportunities/:id/manual-score` | ADMIN | Submit manual attachment-layer signals; validates NSNs against FLIS; routes result to InboxItem or ScoringQueue |
 | POST | `/api/db/attachments/:id/parse` | READ_ONLY+ | Parse a PDF/DOCX attachment and return extracted text (preview only, not saved) |
 | POST | `/api/db/attachments/:id/save-parsed` | READ_ONLY+ | Save previously parsed text to the database after user review |
 | GET | `/api/db/attachments/:id/text` | READ_ONLY+ | Retrieve saved parsed text for an attachment |
@@ -614,6 +616,58 @@ The `score_opportunity` MCP tool provides a lightweight HIGH/MEDIUM/LOW assessme
 | ≥ 7 | HIGH |
 | ≥ 4 | MEDIUM |
 | < 4 | LOW |
+
+### Manual Scoring
+
+For active opportunities that have **no parseable attachments** (PDFs/DOCX), the automated Layer 2 pipeline cannot run. Admins can trigger a manual score from the opportunity detail page using the **Manual Score** button.
+
+#### When the button is shown
+
+- Opportunity is active
+- No PDF or DOCX attachments are present
+- User is ADMIN
+- The button is **disabled** (with a tooltip) if the opportunity already has a `PENDING` ScoringQueue entry — the pending item must be approved or dismissed first
+
+#### How it works
+
+The modal is two-step:
+
+**Step 1 — Build**
+
+- The metadata layer (`scoreOpportunityMetadata`) runs immediately on open and displays the **ground-truth signals** already matched (NAICS, PSC, agency history, deadline, keywords) as read-only pills
+- Admin selects **attachment-layer signals** manually:
+  - **NSN lookup** — search FLIS by item name or NSN; each selected item contributes `NSN_MATCH` (+5), `ITEM_NAME` (+3, first only), and `COMMON_NAME` (+2, first only)
+  - **PSC in text** — checkbox, adds `PSC_IN_TEXT` (+1)
+  - **Keywords** — multi-select from the active solicitation keyword list, each adds `KEYWORD` (+2)
+
+**Step 2 — Preview**
+
+- Displays total score, routing decision badge (`AUTO_ADMIT` / `QUEUE` / `BELOW_THRESHOLD`), and the full signal breakdown
+- Admin can go back to adjust or confirm to submit
+
+#### Routing
+
+Same thresholds as the automated pipeline:
+
+| Score | Action |
+|-------|--------|
+| **≥ 8** | Auto-admit — creates or updates an `InboxItem` |
+| **4–7** | Queue for review — creates or updates a `ScoringQueue` entry |
+| **< 4** | Below threshold — no record created |
+
+The operation is **non-destructive**: if an `InboxItem` already exists, only `attachmentScore` and `matchedSignals` are updated (status and notes are preserved). A `ScoringQueue` entry that already exists is similarly updated rather than replaced.
+
+#### Signal bank (attachment layer only)
+
+| Signal | Points | Notes |
+|--------|--------|-------|
+| `NSN_MATCH` | +5 per NSN | Validated against FLIS table |
+| `ITEM_NAME` | +3 | First FLIS item with a name match only |
+| `COMMON_NAME` | +2 | First FLIS item with a common name only |
+| `PSC_IN_TEXT` | +1 | Checkbox — admin asserts PSC appears in document |
+| `KEYWORD` | +2 per keyword | From active solicitation keyword list |
+
+---
 
 ### ML-Friendly Architecture
 
