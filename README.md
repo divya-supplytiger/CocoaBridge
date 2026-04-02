@@ -87,13 +87,25 @@ INNGEST_ID=your_inngest_app_id
 # SAM.gov API
 SAMGOV_API_KEY=your_sam_gov_api_key
 SAMGOV_BASE_URL=https://api.sam.gov/opportunities/v2/search
-SAMGOV_NOTICE_DESC_URL=https://api.sam.gov/opportunities/v1/noticedesc
+SAMGOV_NOTICE_DESC_URL=https://api.sam.gov/prod/opportunities/v1/noticedesc
+SAMGOV_AWARD_URL=https://api.sam.gov/contract-awards/v1/search
+SAMGOV_RESOURCES_URL=https://sam.gov/api/prod/opps/v3/opportunities
 
 # USASpending API
 USASPENDING_BASE_URL=https://api.usaspending.gov
 
 # Neon DB REST API (for direct queries)
 NEON_DB_API=your_neon_api_key
+
+# GSA Acquisition API
+GSA_AQUISITION_API_KEY=your_gsa_acquisition_api_key
+
+# MCP Server (internal bridge)
+MCP_SERVER_URL=http://localhost:3001
+MCP_SECRET=your_mcp_shared_secret
+
+# AI model
+GEMINI_API_KEY=your_gemini_api_key
 
 # Admin access — comma-separated emails that auto-receive ADMIN role on signup
 ADMIN_EMAILS=admin@example.com,another@example.com
@@ -104,6 +116,23 @@ ADMIN_EMAILS=admin@example.com,another@example.com
 ```env
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_xxx
 VITE_API_BASE_URL=https://your-backend.vercel.app/api
+VITE_ENV=development
+```
+
+**`mcp/.env`**
+
+```env
+# Database (same Neon DB as backend)
+DATABASE_URL=postgresql://user:pass@host/dbname
+
+# MCP Server
+PORT=3001
+NODE_ENV=development
+MCP_SERVER_URL=http://localhost:3001
+MCP_SECRET=your_mcp_shared_secret
+
+# AI model
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
 ### 4. Database Setup
@@ -511,7 +540,7 @@ The **Score New Opportunity Attachments** job (manually triggerable from Admin �
 - Have no existing `InboxItem`
 - Have no pending `ScoringQueue` entry
 
-### Scoring Algorithm
+### Opportunity Scoring Algorithm
 
 Each opportunity is scored against two layers:
 
@@ -520,22 +549,27 @@ Each opportunity is scored against two layers:
 | Signal | Points | Source |
 |--------|--------|--------|
 | NAICS code matches active filter config | +2 | opportunity |
+| NAICS code is a core code (`424450`, `424410`, `424490`) | +3 additional | opportunity |
+| PSC code matches active filter config prefixes | +2 | opportunity |
+| PSC code is a core code (`8925`, `8950`, `8970`) | +2 additional | opportunity |
 | Agency has prior award history in target NAICS/PSC | +1 | awards table |
 | Response deadline ≥ 14 days away | +1 | opportunity |
 | Response deadline < 7 days away | -1 | opportunity |
 | Title/description keyword match (solicitation keywords) | +2 per match | opportunity |
+
+> A single opportunity can score up to +5 for NAICS (base +2, priority +3) and +4 for PSC (base +2, priority +2) from metadata alone.
 
 **Layer 2 — Attachment signals** (evaluated against parsed PDF/DOCX content; falls back to metadata text if no attachments):
 
 | Signal | Points | Source |
 |--------|--------|--------|
 | NSN found in text matches a FLIS item | +5 per NSN | attachment |
-| FLIS item name found in text | +3 | attachment |
-| FLIS common name found in text | +2 | attachment |
+| FLIS item name found in text | +3 (first match only) | attachment |
+| FLIS common name found in text | +2 (first match only) | attachment |
 | Target PSC code found in text | +1 | attachment |
 | Keyword match not already caught in metadata | +2 per match | attachment |
 
-The best-scoring attachment contributes its signals; others are discarded to avoid double-counting.
+The best-scoring attachment contributes its signals; others are discarded to avoid double-counting. If no attachments exist, Layer 2 falls back to scoring the title + description text.
 
 ### Routing by Score
 
@@ -545,6 +579,42 @@ The best-scoring attachment contributes its signals; others are discarded to avo
 | **4–7** | **Queue for review** — creates a `ScoringQueue` entry. Expires at the earlier of 14 days or the opportunity deadline. Attachment text is persisted. |
 | **< 4** | **Drop** — no record created; opportunity is skipped on future runs until it changes. |
 
+### Award Scoring Algorithm
+
+Awards ingested from USASpending.gov are scored using `scoreAwardForInbox` against SupplyTiger's domain signals. Awards scoring below **2** are skipped entirely.
+
+| Signal | Points | Source |
+|--------|--------|--------|
+| PSC code matches classification prefixes (`8925`, `8950`, `8970`) | +2 | award |
+| PSC code is a core code (`8925`, `8950`, `8970`) | +2 additional | award |
+| NAICS code matches target prefixes | +2 | award |
+| NAICS code is a core code (`424450`, `424410`, `424490`) | +3 additional | award |
+| Description keyword match (solicitation keywords, first match) | +2 | award |
+| Obligated amount is below micropurchase threshold (`$10,000`) | +2 | award |
+| Agency has prior award history in target NAICS/PSC | +1 | awards table |
+
+Awards sourced from `internal/award.upserted` events are scored on ingest; the `InboxItem` is created with `attachmentScore` and `matchedSignals` populated. The backfill job (`runBackfillAwardInboxScores`) retroactively scores award-linked inbox items that have no score.
+
+### MCP `score_opportunity` Tool (AI Scoring)
+
+The `score_opportunity` MCP tool provides a lightweight HIGH/MEDIUM/LOW assessment used by the AI chat assistant. It uses a simpler point model than the inbox pipeline:
+
+| Signal | Points |
+|--------|--------|
+| NAICS code matches active filter config | +3 |
+| PSC code matches active filter config | +2 |
+| Title/description keyword match | +2 |
+| Acquisition path fits (SOLICITATION, PRE_SOLICITATION, SOURCES_SOUGHT → GSA; AWARD_NOTICE → SUBCONTRACTING) | +1 |
+| Agency has prior award history in relevant NAICS/PSC | +2 |
+| Response deadline ≥ 14 days away | +1 |
+| Response deadline < 7 days away | -1 |
+
+| Score | Rating |
+|-------|--------|
+| ≥ 7 | HIGH |
+| ≥ 4 | MEDIUM |
+| < 4 | LOW |
+
 ### ML-Friendly Architecture
 
 All scoring decisions are stored alongside the raw evidence that drove them:
@@ -553,7 +623,9 @@ All scoring decisions are stored alongside the raw evidence that drove them:
 - **`InboxItem.matchedSignals`** / **`ScoringQueue.matchedSignals`** — a JSON array of every signal that fired, with `{ type, value, source }` (e.g. `{ type: "NSN_MATCH", value: "8925-01-234-5678", source: "attachment" }`). This makes the scoring auditable and can serve as labeled training data for a future ML classifier.
 - **`OpportunityAttachment.parsedText`** — the full extracted text stored alongside the opportunity so it can be re-scored or used as a feature corpus without re-downloading the file.
 
-Signal types: `NAICS_MATCH`, `AGENCY_HISTORY`, `DEADLINE_FAVORABLE`, `KEYWORD`, `NSN_MATCH`, `ITEM_NAME`, `COMMON_NAME`, `PSC_IN_TEXT`.
+Opportunity signal types: `NAICS_MATCH`, `NAICS_PRIORITY`, `PSC_MATCH`, `PSC_PRIORITY`, `AGENCY_HISTORY`, `DEADLINE_FAVORABLE`, `KEYWORD`, `NSN_MATCH`, `ITEM_NAME`, `COMMON_NAME`, `PSC_IN_TEXT`.
+
+Award signal types: `PSC_MATCH`, `PSC_PRIORITY`, `NAICS_MATCH`, `NAICS_PRIORITY`, `KEYWORD`, `MICROPURCHASE`, `AGENCY_HISTORY`.
 
 ---
 
