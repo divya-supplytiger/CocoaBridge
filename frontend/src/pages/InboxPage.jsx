@@ -42,12 +42,12 @@ function SignalPills({ signals }) {
 }
 
 function PendingReviewTab({ isAdmin }) {
-  const [page, setPage] = usePageParam();
+  const [page, setPage] = useState(1);
   const queryClient = useQueryClient();
   const [pendingDismissId, setPendingDismissId] = useState(null);
 
   const { data: result, isLoading, isError, error } = useQuery({
-    queryKey: ["scoringQueue", page],
+    queryKey: ["scoringQueueList", page],
     queryFn: () => dbApi.listScoringQueue({ page, limit: 50 }),
   });
 
@@ -56,6 +56,7 @@ function PendingReviewTab({ isAdmin }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inboxItems"] });
       queryClient.invalidateQueries({ queryKey: ["scoringQueue"] });
+      queryClient.invalidateQueries({ queryKey: ["scoringQueueList"] });
       toast.success("Approved — item added to inbox");
     },
     onError: (err) => toast.error(err?.response?.data?.error ?? "Failed to approve"),
@@ -65,6 +66,7 @@ function PendingReviewTab({ isAdmin }) {
     mutationFn: (id) => dbApi.dismissScoringQueueItem(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["scoringQueue"] });
+      queryClient.invalidateQueries({ queryKey: ["scoringQueueList"] });
       toast.success("Dismissed");
       setPendingDismissId(null);
     },
@@ -81,6 +83,11 @@ function PendingReviewTab({ isAdmin }) {
       render: (opp) => opp?.title ?? "—",
     },
     {
+      accessor: "opportunity.type",
+      header: "Type",
+      render: (_, row) => row.opportunity?.type ? <span className="badge badge-info text-white">{row.opportunity.type}</span> : "—",
+    },
+        {
       accessor: "score",
       header: "Score",
       render: (val) => <span className="badge badge-warning font-mono">{val}</span>,
@@ -91,15 +98,11 @@ function PendingReviewTab({ isAdmin }) {
       render: (val) => <SignalPills signals={val} />,
     },
     {
-      accessor: "opportunity",
-      header: "Type",
-      render: (opp) => opp?.type ? <span className="badge badge-info text-white">{opp.type}</span> : "—",
-    },
-    {
       accessor: "expiresAt",
       header: "Expires",
       render: (val) => val ? new Date(val).toLocaleDateString() : "—",
     },
+  
     ...(isAdmin ? [
       {
         accessor: "id",
@@ -240,8 +243,17 @@ const InboxPage = () => {
 
   const columns = [
     { accessor: "title", header: "Title", render: (val) => val ?? "—" },
-    { accessor: "type", header: "Type",     render: (val) => val ? <span className="badge badge-info text-white">{val}</span> : "—",
- },
+    { accessor: "type", header: "Type", render: (val) => val ? <span className="badge badge-info text-white">{val}</span> : "—" },
+    {
+      accessor: "attachmentScore",
+      header: "Score",
+      render: (val) => val != null ? <span className="badge badge-warning font-mono">{val}</span> : <span className="text-base-content/40">—</span>,
+    },
+    {
+      accessor: "matchedSignals",
+      header: "Matched Signals",
+      render: (val) => val?.length > 0 ? <SignalPills signals={val} /> : <span className="text-base-content/40">—</span>,
+    },
     {
       accessor: "reviewStatus",
       header: "Status",
