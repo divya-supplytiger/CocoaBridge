@@ -15,7 +15,7 @@ import {
 import { runCurrentOpportunitiesSyncFromSam, runIndustryDaySyncFromSam } from "../controllers/sam.controller.js";
 import { runAwardsSyncFromUsaspending } from "../controllers/usaspending.controller.js";
 import { withSyncLog } from "../controllers/admin.controller.js";
-import { runScoreNewOpportunityAttachments, runCleanupExpiredScoringQueue, scoreOpportunityForInbox } from "../utils/inboxScoring.js";
+import { runScoreNewOpportunityAttachments, runCleanupExpiredScoringQueue, scoreOpportunityForInbox, scoreAwardForInbox } from "../utils/inboxScoring.js";
 import { loadFilterConfig } from "../utils/filterConfig.js";
 import { FLIS_PSC } from "../utils/globals.js";
 
@@ -143,6 +143,21 @@ const upsertInboxItemFromAwardEvent = inngest.createFunction(
 
     const source = data.source;
 
+    const award = await prisma.award.findUnique({
+      where: { id: data.awardId },
+      select: { naicsCodes: true, pscCode: true, description: true, obligatedAmount: true, buyingOrganizationId: true },
+    });
+
+    if (!award) {
+      return { skipped: true, reason: "Award not found" };
+    }
+
+    const { score, matchedSignals, skip } = await scoreAwardForInbox(award);
+
+    if (skip) {
+      return { skipped: true, reason: "Score below threshold", score, awardId: data.awardId };
+    }
+
     const inboxItem = await prisma.inboxItem.upsert({
       where: {
         source_awardId: {
@@ -157,6 +172,8 @@ const upsertInboxItemFromAwardEvent = inngest.createFunction(
         title: data.title ?? null,
         summary: data.summary ?? null,
         buyingOrganizationId: data.buyingOrganizationId ?? null,
+        attachmentScore: score,
+        matchedSignals,
       },
       create: {
         source,
@@ -167,6 +184,8 @@ const upsertInboxItemFromAwardEvent = inngest.createFunction(
         summary: data.summary ?? null,
         buyingOrganizationId: data.buyingOrganizationId ?? null,
         awardId: data.awardId,
+        attachmentScore: score,
+        matchedSignals,
       },
     });
 
@@ -175,6 +194,7 @@ const upsertInboxItemFromAwardEvent = inngest.createFunction(
       inboxItemId: inboxItem.id,
       source,
       awardId: data.awardId,
+      score,
       op: data.op ?? "UPSERTED",
     };
   },

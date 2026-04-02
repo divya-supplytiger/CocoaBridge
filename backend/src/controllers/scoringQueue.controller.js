@@ -15,12 +15,17 @@ export const listScoringQueue = async (req, res) => {
 
     const where = { status: "PENDING" };
 
+    const validSortFields = ["score", "createdAt", "expiresAt"];
+    const sortBy = validSortFields.includes(req.query.sortBy) ? req.query.sortBy : null;
+    const sortDir = req.query.sortDir === "asc" ? "asc" : "desc";
+    const orderBy = sortBy ? { [sortBy]: sortDir } : { createdAt: "desc" };
+
     const [total, items] = await Promise.all([
       prisma.scoringQueue.count({ where }),
       prisma.scoringQueue.findMany({
         where,
         include: { opportunity: true },
-        orderBy: { createdAt: "desc" },
+        orderBy,
         skip,
         take: limit,
       }),

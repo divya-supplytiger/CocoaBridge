@@ -2,7 +2,7 @@ import prisma from "../config/db.js";
 import { runCurrentOpportunitiesSyncFromSam, runIndustryDaySyncFromSam } from "./sam.controller.js";
 import { runAwardsSyncFromUsaspending } from "./usaspending.controller.js";
 import { runBackfillNullOpportunityDescriptionsFromSam, runBackfillOpportunityAttachments, runScoreAllParsedAttachments } from "./db.controller.js";
-import { runScoreNewOpportunityAttachments, runBackfillInboxItemScores } from "../utils/inboxScoring.js";
+import { runScoreNewOpportunityAttachments, runBackfillInboxItemScores, runBackfillAwardInboxScores } from "../utils/inboxScoring.js";
 import { loadFilterConfig, VALID_CONFIG_KEYS } from "../utils/filterConfig.js";
 
 // ─── SyncLog helper ──────────────────────────────────────────────────────────
@@ -133,6 +133,9 @@ const KNOWN_JOBS = [
   { jobId: "mark-past-industry-days", jobName: "Mark Past Industry Days" },
   { jobId: "cleanup-expired-chats", jobName: "Cleanup Expired Chats" },
   { jobId: "score-parsed-attachments", jobName: "Score Parsed Attachments" },
+  { jobId: "score-new-opportunity-attachments", jobName: "Score New Opportunity Attachments" },
+  { jobId: "backfill-inbox-item-scores", jobName: "Backfill Inbox Item Scores" },
+  { jobId: "backfill-award-inbox-scores", jobName: "Backfill Award Inbox Scores" },
 ];
 
 export const getSystemHealth = async (req, res) => {
@@ -258,6 +261,16 @@ const SYNC_JOBS = {
     jobId: "backfill-inbox-item-scores",
     jobName: "Backfill Inbox Item Scores",
     fn: () => runBackfillInboxItemScores(),
+    countFn: (r) => r?.results?.scored ?? null,
+    failFn: (r) => {
+      const n = r?.results?.failed ?? 0;
+      return n > 0 ? `${n} scoring error(s)` : null;
+    },
+  },
+  "backfill-award-inbox-scores": {
+    jobId: "backfill-award-inbox-scores",
+    jobName: "Backfill Award Inbox Scores",
+    fn: () => runBackfillAwardInboxScores(),
     countFn: (r) => r?.results?.scored ?? null,
     failFn: (r) => {
       const n = r?.results?.failed ?? 0;

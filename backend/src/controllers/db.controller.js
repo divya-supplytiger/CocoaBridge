@@ -462,10 +462,13 @@ export const listInboxItems = async (req, res) => {
     const where = {};
     if (req.query.status) where.reviewStatus = req.query.status;
     if (req.query.title) where.opportunity = { title: { contains: req.query.title, mode: "insensitive" } };
-    const validInboxSortFields = ["createdAt", "deadline"];
+    const validInboxSortFields = ["createdAt", "deadline", "attachmentScore"];
     const inboxSortBy = validInboxSortFields.includes(req.query.sortBy) ? req.query.sortBy : null;
     const inboxSortDir = req.query.sortDir === "asc" ? "asc" : "desc";
-    const inboxOrderBy = inboxSortBy ? { [inboxSortBy]: inboxSortDir } : { createdAt: "desc" };
+    // For nullable sort fields (attachmentScore), append createdAt as tiebreaker so nulls sink to bottom naturally
+    const inboxOrderBy = inboxSortBy
+      ? [{ [inboxSortBy]: inboxSortDir }, { createdAt: "desc" }]
+      : { createdAt: "desc" };
 
     const [total, items] = await Promise.all([
       prisma.inboxItem.count({ where }),

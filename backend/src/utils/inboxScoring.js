@@ -3,7 +3,7 @@ import prisma from "../config/db.js";
 import { parseAttachmentContent } from "./parseAttachmentContent.js";
 import { loadFilterConfig } from "./filterConfig.js";
 import { buildInboxTitle } from "./inboxText.js";
-import { CORE_PSC, CORE_NAICS, FLIS_PSC } from "./globals.js";
+import { CORE_PSC, CORE_NAICS, FLIS_PSC, classificationPrefixes, naicsPrefixes, solicitationTitleKeywords, MICROPURCHASE_THRESHOLD } from "./globals.js";
 
 // NSN format: 4-digit FSC + 2-digit country code + 3-digit item number + 4-digit variant
 const NSN_REGEX = /\b\d{4}-\d{2}-\d{3}-\d{4}\b/g;
@@ -51,18 +51,24 @@ export async function scoreOpportunityForInbox(opportunity, flisItems, filterCon
 
   // Agency award history
   if (opportunity.buyingOrganizationId) {
-    const historyCount = await prisma.award.count({
-      where: {
-        buyingOrganizationId: opportunity.buyingOrganizationId,
-        OR: [
-          { naicsCodes: { hasSome: filterConfig.naicsCodes } },
-          { pscCode: { in: filterConfig.pscPrefixes } },
-        ],
-      },
-    });
+    const [historyCount, org] = await Promise.all([
+      prisma.award.count({
+        where: {
+          buyingOrganizationId: opportunity.buyingOrganizationId,
+          OR: [
+            { naicsCodes: { hasSome: filterConfig.naicsCodes } },
+            { pscCode: { in: filterConfig.pscPrefixes } },
+          ],
+        },
+      }),
+      prisma.buyingOrganization.findUnique({
+        where: { id: opportunity.buyingOrganizationId },
+        select: { name: true },
+      }),
+    ]);
     if (historyCount > 0) {
       score += 1;
-      matchedSignals.push({ type: "AGENCY_HISTORY", value: opportunity.buyingOrganizationId, source: "awards" });
+      matchedSignals.push({ type: "AGENCY_HISTORY", value: org?.name ?? opportunity.buyingOrganizationId, source: "awards" });
     }
   }
 
@@ -302,6 +308,132 @@ export async function runBackfillInboxItemScores() {
       results.failed++;
       errors.push({ inboxItemId: item.id, error: err.message });
       console.error(`runBackfillInboxItemScores: error on inbox item ${item.id}:`, err.message);
+    }
+  }
+
+  return { results, errors };
+}
+
+/**
+ * Score an award against SupplyTiger domain signals.
+ * Returns { score, matchedSignals } or { score, matchedSignals, skip: true } if below threshold.
+ *
+ * @param {object} award - Award record with { naicsCodes, pscCode, description, obligatedAmount, buyingOrganizationId }
+ */
+export async function scoreAwardForInbox(award) {
+  const matchedSignals = [];
+  let score = 0;
+
+  // PSC match
+  if (award.pscCode && classificationPrefixes.some(p => award.pscCode.startsWith(p))) {
+    score += 2;
+    matchedSignals.push({ type: "PSC_MATCH", value: award.pscCode, source: "award" });
+
+    if (CORE_PSC.includes(award.pscCode)) {
+      score += 2;
+      matchedSignals.push({ type: "PSC_PRIORITY", value: award.pscCode, source: "award" });
+    }
+  }
+
+  // NAICS match
+  if (award.naicsCodes?.length > 0) {
+    const matchedNaics = award.naicsCodes.find(code =>
+      naicsPrefixes.some(prefix => code.startsWith(prefix))
+    );
+    if (matchedNaics) {
+      score += 2;
+      matchedSignals.push({ type: "NAICS_MATCH", value: matchedNaics, source: "award" });
+
+      if (CORE_NAICS.includes(matchedNaics)) {
+        score += 3;
+        matchedSignals.push({ type: "NAICS_PRIORITY", value: matchedNaics, source: "award" });
+      }
+    }
+  }
+
+  // Keyword match on description (first match only)
+  if (award.description) {
+    const descLower = award.description.toLowerCase();
+    const kw = solicitationTitleKeywords.find(k => descLower.includes(k.toLowerCase()));
+    if (kw) {
+      score += 2;
+      matchedSignals.push({ type: "KEYWORD", value: kw, source: "award" });
+    }
+  }
+
+  // Micropurchase boost
+  if (award.obligatedAmount != null && Number(award.obligatedAmount) < MICROPURCHASE_THRESHOLD) {
+    score += 2;
+    matchedSignals.push({ type: "MICROPURCHASE", value: `$${Number(award.obligatedAmount).toFixed(0)}`, source: "award" });
+  }
+
+  // Agency award history
+  if (award.buyingOrganizationId) {
+    const [historyCount, org] = await Promise.all([
+      prisma.award.count({
+        where: {
+          buyingOrganizationId: award.buyingOrganizationId,
+          OR: [
+            { naicsCodes: { hasSome: naicsPrefixes } },
+            { pscCode: { in: classificationPrefixes } },
+          ],
+        },
+      }),
+      prisma.buyingOrganization.findUnique({
+        where: { id: award.buyingOrganizationId },
+        select: { name: true },
+      }),
+    ]);
+    if (historyCount > 0) {
+      score += 1;
+      matchedSignals.push({ type: "AGENCY_HISTORY", value: org?.name ?? award.buyingOrganizationId, source: "awards" });
+    }
+  }
+
+  if (score < 2) {
+    return { score, matchedSignals, skip: true };
+  }
+
+  return { score, matchedSignals };
+}
+
+/**
+ * Backfill attachmentScore + matchedSignals on award-linked InboxItems that have no score yet.
+ * Null-only — does not overwrite existing scores, does not delete items below threshold.
+ */
+export async function runBackfillAwardInboxScores() {
+  const inboxItems = await prisma.inboxItem.findMany({
+    where: {
+      awardId: { not: null },
+      attachmentScore: null,
+    },
+    select: { id: true, awardId: true },
+  });
+
+  const awardIds = inboxItems.map(i => i.awardId).filter(Boolean);
+  const awards = await prisma.award.findMany({
+    where: { id: { in: awardIds } },
+    select: { id: true, naicsCodes: true, pscCode: true, description: true, obligatedAmount: true, buyingOrganizationId: true },
+  });
+  const awardMap = Object.fromEntries(awards.map(a => [a.id, a]));
+
+  const results = { scored: 0, failed: 0 };
+  const errors = [];
+
+  for (const item of inboxItems) {
+    const award = awardMap[item.awardId];
+    if (!award) continue;
+    try {
+      const { score, matchedSignals } = await scoreAwardForInbox(award);
+      await prisma.inboxItem.update({
+        where: { id: item.id },
+        data: { attachmentScore: score, matchedSignals },
+      });
+      results.scored++;
+    } catch (err) {
+      results.failed++;
+      errors.push({ inboxItemId: item.id, error: err.message });
+      console.error(`runBackfillAwardInboxScores: error on inbox item ${item.id}:`, err.message);
     }
   }
 
