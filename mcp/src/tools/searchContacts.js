@@ -11,6 +11,7 @@ export function registerSearchContacts(server) {
         keyword: z.string().optional().describe("Searches linked opportunity titles/descriptions and industryDay titles/summaries (case-insensitive)"),
         opportunityId: z.string().optional().describe("Filter contacts linked to a specific opportunity"),
         buyingOrgId: z.string().optional().describe("Filter contacts linked to a specific buying org"),
+        includeInboxContacts: z.boolean().optional().describe("Include contacts linked to inbox items (excluded by default)"),
         limit: z.number().optional().describe("Max results (default 20, max 50)"),
         offset: z.number().optional().describe("Number of results to skip for pagination (default 0)"),
       },
@@ -21,13 +22,12 @@ export function registerSearchContacts(server) {
         openWorldHint: false,
       },
     },
-    async ({ keyword, opportunityId, buyingOrgId, limit: rawLimit, offset: rawOffset }) => {
+    async ({ keyword, opportunityId, buyingOrgId, includeInboxContacts, limit: rawLimit, offset: rawOffset }) => {
       try {
         const limit = Math.min(Math.max(rawLimit ?? 20, 1), 50);
         const offset = Math.max(rawOffset ?? 0, 0);
 
-        // Exclude InboxItem contacts per FR7
-        const where = { inboxItemId: null };
+        const where = includeInboxContacts ? {} : { inboxItemId: null };
 
         if (opportunityId) where.opportunityId = opportunityId;
         if (buyingOrgId) where.buyingOrganizationId = buyingOrgId;
@@ -49,6 +49,7 @@ export function registerSearchContacts(server) {
               opportunity: { select: { id: true, title: true } },
               industryDay: { select: { id: true, title: true } },
               buyingOrganization: { select: { id: true, name: true } },
+              inboxItem: { select: { id: true, title: true } },
             },
             take: limit,
             skip: offset,
@@ -58,7 +59,9 @@ export function registerSearchContacts(server) {
         const results = links.map((link) => {
           const { contact } = link;
           let linkedTo;
-          if (link.opportunity) {
+          if (link.inboxItem) {
+            linkedTo = { type: "inboxItem", id: link.inboxItem.id, title: link.inboxItem.title };
+          } else if (link.opportunity) {
             linkedTo = { type: "opportunity", id: link.opportunity.id, title: link.opportunity.title };
           } else if (link.industryDay) {
             linkedTo = { type: "industryDay", id: link.industryDay.id, title: link.industryDay.title };

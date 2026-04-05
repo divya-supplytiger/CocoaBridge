@@ -17,20 +17,26 @@ export function registerGetAward(server) {
     },
     async ({ id }) => {
       try {
-        const award = await prisma.award.findUnique({
-          where: { id },
-          include: {
-            recipient: {
-              select: { name: true, uei: true },
+        const [award, inboxItem] = await Promise.all([
+          prisma.award.findUnique({
+            where: { id },
+            include: {
+              recipient: {
+                select: { name: true, uei: true },
+              },
+              buyingOrganization: {
+                select: { name: true, level: true },
+              },
+              opportunity: {
+                select: { title: true },
+              },
             },
-            buyingOrganization: {
-              select: { name: true, level: true },
-            },
-            opportunity: {
-              select: { title: true },
-            },
-          },
-        });
+          }),
+          prisma.inboxItem.findFirst({
+            where: { awardId: id },
+            select: { id: true, reviewStatus: true, attachmentScore: true, matchedSignals: true },
+          }),
+        ]);
 
         if (!award) {
           return {
@@ -39,9 +45,19 @@ export function registerGetAward(server) {
           };
         }
 
+        const inboxStatus = {
+          inInbox: !!inboxItem,
+          ...(inboxItem && {
+            reviewStatus: inboxItem.reviewStatus,
+            attachmentScore: inboxItem.attachmentScore,
+            matchedSignals: inboxItem.matchedSignals,
+          }),
+        };
+
         const result = {
           ...award,
           obligatedAmount: award.obligatedAmount ? Number(award.obligatedAmount) : null,
+          inboxStatus,
         };
 
         return {

@@ -14,6 +14,7 @@ import { registerSearchPublogItems } from "./tools/searchPublogItems.js";
 import { registerGetCidSpec } from "./tools/getCidSpec.js";
 import { registerGetAttachmentText } from "./tools/getAttachmentText.js";
 import { registerGetCalendarEvents } from "./tools/getCalendarEvents.js";
+import { registerSearchInboxOpportunities } from "./tools/searchInboxOpportunities.js";
 import { registerResources } from "./resourcesConfig.js";
 import { registerPrompts } from "./prompts.js";
 import { registerPromptTools } from "./tools/promptTools.js";
@@ -45,6 +46,7 @@ export function createMcpServer() {
   registerGetCidSpec(server);
   registerGetAttachmentText(server);
   registerGetCalendarEvents(server);
+  registerSearchInboxOpportunities(server);
   registerResources(server);
   registerPrompts(server);
   registerPromptTools(server);

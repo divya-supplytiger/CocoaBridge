@@ -216,12 +216,38 @@ export function registerScoreOpportunity(server) {
         const overallScore = computeOverallScore(dimensions);
         const reasoning = buildReasoning(dimensions, overallScore);
 
+        // Inbox/queue status lookup (parallel, non-blocking)
+        const [inboxItem, queueEntry] = await Promise.all([
+          prisma.inboxItem.findFirst({
+            where: { opportunityId: id },
+            select: { id: true, reviewStatus: true, attachmentScore: true },
+          }),
+          prisma.scoringQueue.findFirst({
+            where: { opportunityId: id, status: "PENDING" },
+            select: { id: true, score: true, expiresAt: true },
+          }),
+        ]);
+
+        const inboxStatus = {
+          inInbox: !!inboxItem,
+          inQueue: !!queueEntry,
+          ...(inboxItem && {
+            reviewStatus: inboxItem.reviewStatus,
+            attachmentScore: inboxItem.attachmentScore,
+          }),
+          ...(queueEntry && {
+            queueScore: queueEntry.score,
+            expiresAt: queueEntry.expiresAt,
+          }),
+        };
+
         const result = {
           opportunityId: opportunity.id,
           title: opportunity.title,
           overallScore,
           dimensions,
           reasoning,
+          inboxStatus,
         };
 
         return {

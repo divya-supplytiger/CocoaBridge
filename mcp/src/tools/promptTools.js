@@ -3,6 +3,7 @@ import {
   buildBidDraftPrompt,
   buildOpportunityFitPrompt,
   buildFulfillmentPrompt,
+  buildOutreachDraftPrompt,
 } from "../promptLogic.js";
 
 /**
@@ -83,6 +84,29 @@ export function registerPromptTools(server) {
     },
     async ({ opportunityId }) => {
       const result = await buildFulfillmentPrompt(opportunityId);
+      const text = INSTRUCTION_PREAMBLE + result.messages[0].content.text;
+      return { content: [{ type: "text", text }] };
+    }
+  );
+
+  server.registerTool(
+    "generate_outreach_draft",
+    {
+      title: "Generate Outreach Draft",
+      description:
+        "Draft a professional outreach email to the contracting POC for a confirmed inbox item, using SupplyTiger's company profile, opportunity details, matched NSN signals, and pipeline score. Use when the user wants to initiate contact with a buying organization for an active pursuit.",
+      inputSchema: {
+        inboxItemId: z.string().describe("The inbox item ID to draft outreach for"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ inboxItemId }) => {
+      const result = await buildOutreachDraftPrompt(inboxItemId);
       const text = INSTRUCTION_PREAMBLE + result.messages[0].content.text;
       return { content: [{ type: "text", text }] };
     }

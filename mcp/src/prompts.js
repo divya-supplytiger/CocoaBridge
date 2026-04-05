@@ -3,6 +3,7 @@ import {
   buildBidDraftPrompt,
   buildOpportunityFitPrompt,
   buildFulfillmentPrompt,
+  buildOutreachDraftPrompt,
 } from "./promptLogic.js";
 
 export function registerPrompts(server) {
@@ -43,5 +44,18 @@ export function registerPrompts(server) {
       },
     },
     async ({ opportunityId }) => buildFulfillmentPrompt(opportunityId)
+  );
+
+  server.registerPrompt(
+    "generate-outreach-draft",
+    {
+      title: "Generate Outreach Draft",
+      description:
+        "Draft a professional outreach email to the contracting POC for a confirmed inbox item, using SupplyTiger's company profile and the opportunity details. Use this when you want to initiate contact with the buying organization for an active pursuit.",
+      argsSchema: {
+        inboxItemId: z.string().describe("The inbox item ID to draft outreach for"),
+      },
+    },
+    async ({ inboxItemId }) => buildOutreachDraftPrompt(inboxItemId)
   );
 }

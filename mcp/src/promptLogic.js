@@ -47,6 +47,51 @@ const ATTACHMENT_MESSAGES_HAS_PARSED = {
   fulfillment: 'IMPORTANT: Parsed attachments are available for this opportunity. Use the `get_attachment_text` tool to retrieve and analyze the parsed documents BEFORE assessing fulfillment. Start with the parsed attachments — they likely contain CLIN breakdowns, product specifications, and delivery requirements critical to the FULL/PARTIAL/NO-BID determination. For unparsed attachments, note them to the user and suggest parsing via the SupplyTiger dashboard.',
 };
 
+async function loadInboxContext(opportunityId) {
+  const [inboxItem, queueEntry] = await Promise.all([
+    prisma.inboxItem.findFirst({
+      where: { opportunityId },
+      select: { id: true, reviewStatus: true, attachmentScore: true, matchedSignals: true },
+    }),
+    prisma.scoringQueue.findFirst({
+      where: { opportunityId, status: "PENDING" },
+      select: { score: true, matchedSignals: true, expiresAt: true },
+    }),
+  ]);
+  return { inboxItem, queueEntry };
+}
+
+function buildInboxContextSection(inboxItem, queueEntry) {
+  if (!inboxItem && !queueEntry) return "";
+
+  const source = inboxItem ? "INBOX (confirmed)" : "SCORING QUEUE (pending review)";
+  const score = inboxItem?.attachmentScore ?? queueEntry?.score ?? null;
+  const signals = (inboxItem?.matchedSignals ?? queueEntry?.matchedSignals ?? []);
+
+  const nsnSignals = signals.filter((s) => s.type === "NSN_MATCH");
+  const otherSignals = signals.filter((s) => s.type !== "NSN_MATCH");
+
+  let section = `
+---
+
+## PIPELINE SCORING CONTEXT
+
+This opportunity has been scored by SupplyTiger's automated pipeline and is currently tracked in the **${source}**.
+
+- **Pipeline score:** ${score ?? "N/A"}
+- **Review status:** ${inboxItem?.reviewStatus ?? (queueEntry ? "PENDING REVIEW" : "N/A")}`;
+
+  if (nsnSignals.length > 0) {
+    section += `\n- **Matched NSNs (found in solicitation documents):** ${nsnSignals.map((s) => s.value).join(", ")} — use these NSN values when referencing specific supply items`;
+  }
+
+  if (otherSignals.length > 0) {
+    section += `\n- **Other matched signals:** ${otherSignals.map((s) => `${s.type}${s.value ? ` (${s.value})` : ""}`).join(", ")}`;
+  }
+
+  return section;
+}
+
 async function loadKeywords() {
   const [solicitationKeywords, industryDayKeywords] = await Promise.all([
     prisma.appConfig.findUnique({ where: { key: "solicitationKeywords" } }),
@@ -117,11 +162,15 @@ export async function buildBidDraftPrompt(opportunityId) {
 
   if (!opportunity) return notFoundResult(opportunityId);
 
-  const companyJson = JSON.stringify(COMPANY_PROFILE, null, 2);
-  const templateJson = JSON.stringify(BID_TEMPLATE, null, 2);
+  const [companyJson, templateJson, keywords, { inboxItem, queueEntry }] = await Promise.all([
+    Promise.resolve(JSON.stringify(COMPANY_PROFILE, null, 2)),
+    Promise.resolve(JSON.stringify(BID_TEMPLATE, null, 2)),
+    loadKeywords(),
+    loadInboxContext(opportunityId),
+  ]);
   const cidSection = buildCidSection(opportunity.pscCode);
-  const keywords = await loadKeywords();
   const attachmentSection = buildAttachmentSection(opportunity.attachments, "bid", keywords);
+  const inboxContextSection = buildInboxContextSection(inboxItem, queueEntry);
 
   const promptText = `You are drafting a bid/proposal response for the following federal procurement opportunity on behalf of SupplyTiger (Prime Printer Solution Inc).
 
@@ -180,7 +229,7 @@ ${cidSection}
 
 ---
 
-> **Tip:** You can use the \`search_publog_items\` tool to look up specific NSN/NIIN/FLIS items matching this opportunity's PSC code (${opportunity.pscCode || "N/A"}). This can help you reference exact product lines and item descriptions when drafting the technical approach.${attachmentSection}`;
+> **Tip:** You can use the \`search_publog_items\` tool to look up specific NSN/NIIN/FLIS items matching this opportunity's PSC code (${opportunity.pscCode || "N/A"}). This can help you reference exact product lines and item descriptions when drafting the technical approach.${inboxContextSection}${attachmentSection}`;
 
   return {
     messages: [
@@ -205,7 +254,11 @@ export async function buildOpportunityFitPrompt(opportunityId) {
 
   if (!opportunity) return notFoundResult(opportunityId);
 
-  const keywords = await loadKeywords();
+  const [keywords, { inboxItem, queueEntry }] = await Promise.all([
+    loadKeywords(),
+    loadInboxContext(opportunityId),
+  ]);
+  const inboxContextSection = buildInboxContextSection(inboxItem, queueEntry);
 
   let relatedAwards = [];
   if (opportunity.buyingOrganizationId) {
@@ -343,7 +396,137 @@ Provide a comprehensive analysis covering:
 
 7. **Pursuit Recommendation:** GO / NO-GO / CONDITIONAL recommendation with clear reasoning. If CONDITIONAL, state what additional information is needed.
 
-8. **Next Steps:** If pursuing, what are the immediate action items?${buildAttachmentSection(opportunity.attachments, "fit", keywords)}`;
+8. **Next Steps:** If pursuing, what are the immediate action items?${inboxContextSection}${buildAttachmentSection(opportunity.attachments, "fit", keywords)}`;
+
+  return {
+    messages: [
+      { role: "user", content: { type: "text", text: promptText } },
+    ],
+  };
+}
+
+// --- generate-outreach-draft ---
+export async function buildOutreachDraftPrompt(inboxItemId) {
+  const item = await prisma.inboxItem.findUnique({
+    where: { id: inboxItemId },
+    include: {
+      opportunity: {
+        select: {
+          title: true,
+          type: true,
+          pscCode: true,
+          naicsCodes: true,
+          responseDeadline: true,
+          description: true,
+          solicitationNumber: true,
+        },
+      },
+      buyingOrganization: { select: { name: true } },
+      contactLinks: {
+        include: {
+          contact: { select: { fullName: true, email: true, phone: true, title: true } },
+        },
+      },
+    },
+    // also pull scoring fields directly off InboxItem
+  });
+
+  // Attach score fields (they're on InboxItem itself, already loaded above via findUnique)
+  const attachmentScore = item?.attachmentScore ?? null;
+  const matchedSignals = (item?.matchedSignals ?? []);
+  const nsnSignals = matchedSignals.filter((s) => s.type === "NSN_MATCH");
+
+  if (!item) {
+    return {
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `No inbox item found with ID "${inboxItemId}". Please verify the ID and try again.`,
+          },
+        },
+      ],
+    };
+  }
+
+  const opp = item.opportunity;
+
+  // Pick primary contact, fall back to first
+  const primaryLink =
+    item.contactLinks.find((cl) => cl.type === "PRIMARY") ?? item.contactLinks[0];
+  const primaryContact = primaryLink?.contact ?? null;
+
+  const allContacts = item.contactLinks.map((cl) => ({
+    fullName: cl.contact.fullName,
+    email: cl.contact.email,
+    phone: cl.contact.phone,
+    title: cl.contact.title,
+    role: cl.type,
+  }));
+
+  const companyJson = JSON.stringify(COMPANY_PROFILE, null, 2);
+
+  const promptText = `You are drafting a professional outreach email on behalf of SupplyTiger (Prime Printer Solution Inc) in response to a federal procurement opportunity currently tracked in the SupplyTiger inbox.
+
+---
+
+## INBOX ITEM
+
+- **Title:** ${item.title ?? opp?.title ?? "N/A"}
+- **Review Status:** ${item.reviewStatus}
+- **Acquisition Path:** ${item.acquisitionPath}
+- **Deadline:** ${item.deadline ? new Date(item.deadline).toLocaleDateString() : opp?.responseDeadline ? new Date(opp.responseDeadline).toLocaleDateString() : "Not specified"}
+- **Buying Organization:** ${item.buyingOrganization?.name ?? "N/A"}
+- **Pipeline Score:** ${attachmentScore ?? "N/A"}${nsnSignals.length > 0 ? `\n- **Matched NSNs (from solicitation documents):** ${nsnSignals.map((s) => s.value).join(", ")} — reference these specific items in the email if relevant` : ""}
+
+---
+
+## OPPORTUNITY DETAILS
+
+- **Solicitation #:** ${opp?.solicitationNumber ?? "N/A"}
+- **Type:** ${opp?.type ?? "N/A"}
+- **PSC Code:** ${opp?.pscCode ?? "N/A"}
+- **NAICS Codes:** ${opp?.naicsCodes?.join(", ") ?? "None"}
+- **Description:** ${opp?.description ?? "No description available"}
+
+---
+
+## CONTACTS FOR THIS OPPORTUNITY
+
+${allContacts.length > 0 ? JSON.stringify(allContacts, null, 2) : "No contacts found for this inbox item."}
+
+**Primary contact (for addressing the email):** ${primaryContact ? `${primaryContact.fullName ?? "N/A"} (${primaryContact.title ?? "N/A"}) — ${primaryContact.email ?? "no email"} / ${primaryContact.phone ?? "no phone"}` : "None identified — address to Contracting Officer"}
+
+---
+
+## SUPPLYTIGER COMPANY PROFILE (Sender)
+
+${companyJson}
+
+---
+
+## INSTRUCTIONS
+
+Draft a professional, concise outreach email:
+
+1. **Address** the email to the primary contact by name and title. If no contact is available, address it to "Contracting Officer."
+
+2. **Subject line** should reference the solicitation number (if available) and PSC code, e.g., "SupplyTiger — Interest in [Solicitation #] / PSC ${opp?.pscCode ?? "N/A"}"
+
+3. **Opening paragraph** — introduce SupplyTiger briefly: who we are, our UEI, CAGE code, and that we are a registered SAM vendor.
+
+4. **Capability statement** — state that SupplyTiger specializes in supplying PSC ${opp?.pscCode ?? "N/A"} items (Sugar, Confectionery, and related products), reference 1–2 core competencies from the company profile that align with this opportunity.
+
+5. **Expression of interest** — express intent to respond to the solicitation. If the type is SOURCES_SOUGHT or PRE_SOLICITATION, ask how SupplyTiger can best position for the formal solicitation. If SOLICITATION, confirm readiness to submit.
+
+6. **Call to action** — invite a brief call or ask if they can share any additional documents or Q&A that would help SupplyTiger prepare a competitive offer.
+
+7. **Signature** — use the company contact from the profile (name, phone, email, website).
+
+8. Keep the email under 250 words. Professional, direct, no filler.
+
+Output the email in full, ready to send.`;
 
   return {
     messages: [
@@ -367,7 +550,11 @@ export async function buildFulfillmentPrompt(opportunityId) {
 
   if (!opportunity) return notFoundResult(opportunityId);
 
-  const keywords = await loadKeywords();
+  const [keywords, { inboxItem, queueEntry }] = await Promise.all([
+    loadKeywords(),
+    loadInboxContext(opportunityId),
+  ]);
+  const inboxContextSection = buildInboxContextSection(inboxItem, queueEntry);
 
   const orConditions = [
     ...(opportunity.naicsCodes.length > 0
@@ -567,7 +754,7 @@ Using the historical awards data above:
 
 ### 8. FULFILLABLE ITEMS SUMMARY
 
-List the specific items, product categories, or CLINs that SupplyTiger can deliver. Reference publog FLIS data where available. If the recommendation is FULL, summarize the complete scope. If NO-BID, state why no items are fulfillable.${buildAttachmentSection(opportunity.attachments, "fulfillment", keywords)}`;
+List the specific items, product categories, or CLINs that SupplyTiger can deliver. Reference publog FLIS data where available. If the recommendation is FULL, summarize the complete scope. If NO-BID, state why no items are fulfillable.${inboxContextSection}${buildAttachmentSection(opportunity.attachments, "fulfillment", keywords)}`;
 
   return {
     messages: [

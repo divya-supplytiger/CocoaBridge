@@ -48,6 +48,8 @@ export function registerIntelligenceSummary(server) {
         if (psc) oppWhere.pscCode = psc;
         if (buyingOrgId) oppWhere.buyingOrganizationId = buyingOrgId;
 
+        const hasPscOrNaics = !!(psc || naics);
+
         const [
           totalAwards,
           awardAgg,
@@ -55,6 +57,8 @@ export function registerIntelligenceSummary(server) {
           topBuyingOrgGroups,
           activeOpportunityCount,
           recentOpportunities,
+          activeInboxItems,
+          activeQueueItems,
         ] = await Promise.all([
           // Total awards matching scope
           prisma.award.count({ where: awardWhere }),
@@ -97,6 +101,37 @@ export function registerIntelligenceSummary(server) {
             take: 10,
             select: { id: true, title: true, type: true, postedDate: true },
           }),
+
+          // Active inbox items for this PSC/NAICS (skip if only filtering by buyingOrgId)
+          hasPscOrNaics
+            ? prisma.inboxItem.findMany({
+                where: { opportunityId: { not: null }, opportunity: oppWhere },
+                orderBy: { attachmentScore: "desc" },
+                take: 5,
+                select: {
+                  id: true,
+                  title: true,
+                  reviewStatus: true,
+                  attachmentScore: true,
+                  deadline: true,
+                },
+              })
+            : Promise.resolve([]),
+
+          // Active scoring queue items for this PSC/NAICS
+          hasPscOrNaics
+            ? prisma.scoringQueue.findMany({
+                where: { status: "PENDING", opportunity: oppWhere },
+                orderBy: { score: "desc" },
+                take: 5,
+                select: {
+                  id: true,
+                  score: true,
+                  expiresAt: true,
+                  opportunity: { select: { title: true } },
+                },
+              })
+            : Promise.resolve([]),
         ]);
 
         // Resolve recipient names
@@ -156,6 +191,13 @@ export function registerIntelligenceSummary(server) {
           buyingOrgName = org?.name || null;
         }
 
+        const formattedQueueItems = activeQueueItems.map((q) => ({
+          id: q.id,
+          title: q.opportunity?.title ?? null,
+          score: q.score,
+          expiresAt: q.expiresAt,
+        }));
+
         const result = {
           scope,
           ...(buyingOrgName && { buyingOrgName }),
@@ -170,6 +212,7 @@ export function registerIntelligenceSummary(server) {
           ...(topBuyingOrgs.length > 0 && { topBuyingOrgs }),
           activeOpportunityCount,
           recentOpportunities,
+          ...(hasPscOrNaics && { activeInboxItems, activeQueueItems: formattedQueueItems }),
         };
 
         return {

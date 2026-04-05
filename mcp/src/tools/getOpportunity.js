@@ -17,38 +17,48 @@ export function registerGetOpportunity(server) {
     },
     async ({ id }) => {
       try {
-        const opportunity = await prisma.opportunity.findUnique({
-          where: { id },
-          include: {
-            buyingOrganization: {
-              select: { id: true, name: true, level: true },
-            },
-            contactLinks: {
-              select: {
-                type: true,
-                contact: {
-                  select: { fullName: true, email: true, phone: true, title: true },
+        const [opportunity, inboxItem, queueEntry] = await Promise.all([
+          prisma.opportunity.findUnique({
+            where: { id },
+            include: {
+              buyingOrganization: {
+                select: { id: true, name: true, level: true },
+              },
+              contactLinks: {
+                select: {
+                  type: true,
+                  contact: {
+                    select: { fullName: true, email: true, phone: true, title: true },
+                  },
+                },
+              },
+              attachments: {
+                select: {
+                  id: true,
+                  name: true,
+                  mimeType: true,
+                  size: true,
+                  postedDate: true,
+                  parsedAt: true,
+                },
+                orderBy: { attachmentOrder: "asc" },
+              },
+              _count: {
+                select: {
+                  awards: true,
                 },
               },
             },
-            attachments: {
-              select: {
-                id: true,
-                name: true,
-                mimeType: true,
-                size: true,
-                postedDate: true,
-                parsedAt: true,
-              },
-              orderBy: { attachmentOrder: "asc" },
-            },
-            _count: {
-              select: {
-                awards: true,
-              },
-            },
-          },
-        });
+          }),
+          prisma.inboxItem.findFirst({
+            where: { opportunityId: id },
+            select: { id: true, reviewStatus: true, attachmentScore: true, matchedSignals: true },
+          }),
+          prisma.scoringQueue.findFirst({
+            where: { opportunityId: id, status: "PENDING" },
+            select: { id: true, score: true, expiresAt: true },
+          }),
+        ]);
 
         if (!opportunity) {
           return {
@@ -58,6 +68,20 @@ export function registerGetOpportunity(server) {
         }
 
         const { _count, contactLinks, ...rest } = opportunity;
+        const inboxStatus = {
+          inInbox: !!inboxItem,
+          inQueue: !!queueEntry,
+          ...(inboxItem && {
+            reviewStatus: inboxItem.reviewStatus,
+            attachmentScore: inboxItem.attachmentScore,
+            matchedSignals: inboxItem.matchedSignals,
+          }),
+          ...(queueEntry && {
+            queueScore: queueEntry.score,
+            expiresAt: queueEntry.expiresAt,
+          }),
+        };
+
         const result = {
           ...rest,
           awardCount: _count.awards,
@@ -65,6 +89,7 @@ export function registerGetOpportunity(server) {
             ...cl.contact,
             type: cl.type,
           })),
+          inboxStatus,
         };
 
         return {
