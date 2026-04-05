@@ -419,6 +419,14 @@ export async function buildOutreachDraftPrompt(inboxItemId) {
           responseDeadline: true,
           description: true,
           solicitationNumber: true,
+          contactLinks: {
+            select: {
+              type: true,
+              contact: {
+                select: { fullName: true, email: true, phone: true, title: true },
+              },
+            },
+          },
         },
       },
       buyingOrganization: { select: { name: true } },
@@ -428,13 +436,7 @@ export async function buildOutreachDraftPrompt(inboxItemId) {
         },
       },
     },
-    // also pull scoring fields directly off InboxItem
   });
-
-  // Attach score fields (they're on InboxItem itself, already loaded above via findUnique)
-  const attachmentScore = item?.attachmentScore ?? null;
-  const matchedSignals = (item?.matchedSignals ?? []);
-  const nsnSignals = matchedSignals.filter((s) => s.type === "NSN_MATCH");
 
   if (!item) {
     return {
@@ -451,19 +453,26 @@ export async function buildOutreachDraftPrompt(inboxItemId) {
   }
 
   const opp = item.opportunity;
+  const attachmentScore = item.attachmentScore ?? null;
+  const matchedSignals = (item.matchedSignals ?? []);
+  const nsnSignals = matchedSignals.filter((s) => s.type === "NSN_MATCH");
+
+  // Merge inbox item contacts + opportunity contacts; deduplicate by email
+  const rawContacts = [
+    ...item.contactLinks.map((cl) => ({ ...cl.contact, role: cl.type })),
+    ...(opp?.contactLinks ?? []).map((cl) => ({ ...cl.contact, role: cl.type })),
+  ];
+  const seen = new Set();
+  const allContacts = rawContacts.filter((c) => {
+    const key = c.email ?? c.fullName;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 
   // Pick primary contact, fall back to first
-  const primaryLink =
-    item.contactLinks.find((cl) => cl.type === "PRIMARY") ?? item.contactLinks[0];
-  const primaryContact = primaryLink?.contact ?? null;
-
-  const allContacts = item.contactLinks.map((cl) => ({
-    fullName: cl.contact.fullName,
-    email: cl.contact.email,
-    phone: cl.contact.phone,
-    title: cl.contact.title,
-    role: cl.type,
-  }));
+  const primaryContact =
+    allContacts.find((c) => c.role === "PRIMARY") ?? allContacts[0] ?? null;
 
   const companyJson = JSON.stringify(COMPANY_PROFILE, null, 2);
 
@@ -496,7 +505,7 @@ export async function buildOutreachDraftPrompt(inboxItemId) {
 
 ${allContacts.length > 0 ? JSON.stringify(allContacts, null, 2) : "No contacts found for this inbox item."}
 
-**Primary contact (for addressing the email):** ${primaryContact ? `${primaryContact.fullName ?? "N/A"} (${primaryContact.title ?? "N/A"}) — ${primaryContact.email ?? "no email"} / ${primaryContact.phone ?? "no phone"}` : "None identified — address to Contracting Officer"}
+**Primary contact (for addressing the email):** ${primaryContact ? `${primaryContact.fullName ?? "N/A"} (${primaryContact.title ?? "N/A"}) — ${primaryContact.email ?? "no email"} / ${primaryContact.phone ?? "no phone"}` : "None found — address to Contracting Officer"}
 
 ---
 
