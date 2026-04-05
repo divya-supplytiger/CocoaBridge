@@ -29,24 +29,55 @@ export function registerIntelligenceSummary(server) {
           };
         }
 
-        // Build scope description for the response
+        // Resolve the full org subtree (2 levels deep) when buyingOrgId is provided.
+        // Awards and opportunities are typically posted by child/grandchild offices,
+        // not the top-level agency, so a direct ID match would miss most records.
+        let orgIdSet = null;
+        let buyingOrgContext = null;
+        if (buyingOrgId) {
+          const [rootOrg, children] = await Promise.all([
+            prisma.buyingOrganization.findUnique({
+              where: { id: buyingOrgId },
+              select: { name: true, level: true },
+            }),
+            prisma.buyingOrganization.findMany({
+              where: { parentId: buyingOrgId },
+              select: { id: true },
+            }),
+          ]);
+
+          buyingOrgContext = rootOrg
+            ? `${rootOrg.name} (${rootOrg.level ?? "ORG"})`
+            : buyingOrgId;
+
+          const childIds = children.map((c) => c.id);
+          const grandchildren = childIds.length > 0
+            ? await prisma.buyingOrganization.findMany({
+                where: { parentId: { in: childIds } },
+                select: { id: true },
+              })
+            : [];
+
+          orgIdSet = [buyingOrgId, ...childIds, ...grandchildren.map((g) => g.id)];
+        }
+
+        // Build scope description
         const scopeParts = [];
         if (naics) scopeParts.push(`NAICS ${naics}`);
         if (psc) scopeParts.push(`PSC ${psc}`);
-        if (buyingOrgId) scopeParts.push(`Buying Org ${buyingOrgId}`);
+        if (buyingOrgContext) scopeParts.push(buyingOrgContext);
         const scope = scopeParts.join(" + ");
 
-        // Build shared where clause for awards
+        // Build shared where clauses using expanded org ID set
         const awardWhere = {};
         if (naics) awardWhere.naicsCodes = { hasSome: [naics] };
         if (psc) awardWhere.pscCode = psc;
-        if (buyingOrgId) awardWhere.buyingOrganizationId = buyingOrgId;
+        if (orgIdSet) awardWhere.buyingOrganizationId = { in: orgIdSet };
 
-        // Build shared where clause for opportunities
         const oppWhere = {};
         if (naics) oppWhere.naicsCodes = { hasSome: [naics] };
         if (psc) oppWhere.pscCode = psc;
-        if (buyingOrgId) oppWhere.buyingOrganizationId = buyingOrgId;
+        if (orgIdSet) oppWhere.buyingOrganizationId = { in: orgIdSet };
 
         const hasPscOrNaics = !!(psc || naics);
 
@@ -80,16 +111,15 @@ export function registerIntelligenceSummary(server) {
             take: 10,
           }),
 
-          // Top buying orgs by award count (only relevant when not filtering by buyingOrgId)
-          buyingOrgId
-            ? Promise.resolve([])
-            : prisma.award.groupBy({
-                by: ["buyingOrganizationId"],
-                where: { ...awardWhere, buyingOrganizationId: { not: null } },
-                _count: { id: true },
-                orderBy: { _count: { id: "desc" } },
-                take: 10,
-              }),
+          // Top buying orgs by award count — always run; when filtering by org shows
+          // which child offices are most active under the parent
+          prisma.award.groupBy({
+            by: ["buyingOrganizationId"],
+            where: { ...awardWhere, buyingOrganizationId: { not: null } },
+            _count: { id: true },
+            orderBy: { _count: { id: "desc" } },
+            take: 10,
+          }),
 
           // Active opportunity count
           prisma.opportunity.count({ where: { ...oppWhere, active: true } }),
@@ -102,8 +132,8 @@ export function registerIntelligenceSummary(server) {
             select: { id: true, title: true, type: true, postedDate: true },
           }),
 
-          // Active inbox items for this PSC/NAICS (skip if only filtering by buyingOrgId)
-          hasPscOrNaics
+          // Active inbox items — include when PSC/NAICS filter present or org filter present
+          (hasPscOrNaics || orgIdSet)
             ? prisma.inboxItem.findMany({
                 where: { opportunityId: { not: null }, opportunity: oppWhere },
                 orderBy: { attachmentScore: "desc" },
@@ -118,8 +148,8 @@ export function registerIntelligenceSummary(server) {
               })
             : Promise.resolve([]),
 
-          // Active scoring queue items for this PSC/NAICS
-          hasPscOrNaics
+          // Active scoring queue items
+          (hasPscOrNaics || orgIdSet)
             ? prisma.scoringQueue.findMany({
                 where: { status: "PENDING", opportunity: oppWhere },
                 orderBy: { score: "desc" },
@@ -135,16 +165,13 @@ export function registerIntelligenceSummary(server) {
         ]);
 
         // Resolve recipient names
-        const recipientIds = topRecipientGroups
-          .map((r) => r.recipientId)
-          .filter(Boolean);
-        const recipients =
-          recipientIds.length > 0
-            ? await prisma.recipient.findMany({
-                where: { id: { in: recipientIds } },
-                select: { id: true, name: true, uei: true },
-              })
-            : [];
+        const recipientIds = topRecipientGroups.map((r) => r.recipientId).filter(Boolean);
+        const recipients = recipientIds.length > 0
+          ? await prisma.recipient.findMany({
+              where: { id: { in: recipientIds } },
+              select: { id: true, name: true, uei: true },
+            })
+          : [];
         const recipientMap = new Map(recipients.map((r) => [r.id, r]));
 
         const topRecipients = topRecipientGroups.map((r) => {
@@ -153,20 +180,16 @@ export function registerIntelligenceSummary(server) {
             name: info?.name || "Unknown",
             uei: info?.uei || null,
             awardCount: r._count.id,
-            totalObligated: r._sum.obligatedAmount
-              ? Number(r._sum.obligatedAmount)
-              : 0,
+            totalObligated: r._sum.obligatedAmount ? Number(r._sum.obligatedAmount) : 0,
           };
         });
 
-        // Resolve buying org names (when not filtered by buyingOrgId)
+        // Resolve buying org names for topBuyingOrgs
         let topBuyingOrgs = [];
-        if (!buyingOrgId && topBuyingOrgGroups.length > 0) {
-          const orgIds = topBuyingOrgGroups
-            .map((o) => o.buyingOrganizationId)
-            .filter(Boolean);
+        if (topBuyingOrgGroups.length > 0) {
+          const topOrgIds = topBuyingOrgGroups.map((o) => o.buyingOrganizationId).filter(Boolean);
           const orgs = await prisma.buyingOrganization.findMany({
-            where: { id: { in: orgIds } },
+            where: { id: { in: topOrgIds } },
             select: { id: true, name: true, level: true },
           });
           const orgMap = new Map(orgs.map((o) => [o.id, o]));
@@ -181,16 +204,6 @@ export function registerIntelligenceSummary(server) {
           });
         }
 
-        // If filtering by buyingOrgId, resolve its name for context
-        let buyingOrgName = null;
-        if (buyingOrgId) {
-          const org = await prisma.buyingOrganization.findUnique({
-            where: { id: buyingOrgId },
-            select: { name: true },
-          });
-          buyingOrgName = org?.name || null;
-        }
-
         const formattedQueueItems = activeQueueItems.map((q) => ({
           id: q.id,
           title: q.opportunity?.title ?? null,
@@ -198,9 +211,10 @@ export function registerIntelligenceSummary(server) {
           expiresAt: q.expiresAt,
         }));
 
+        const showInboxData = hasPscOrNaics || !!orgIdSet;
+
         const result = {
           scope,
-          ...(buyingOrgName && { buyingOrgName }),
           totalAwards,
           totalObligated: awardAgg._sum.obligatedAmount
             ? Number(awardAgg._sum.obligatedAmount)
@@ -212,7 +226,7 @@ export function registerIntelligenceSummary(server) {
           ...(topBuyingOrgs.length > 0 && { topBuyingOrgs }),
           activeOpportunityCount,
           recentOpportunities,
-          ...(hasPscOrNaics && { activeInboxItems, activeQueueItems: formattedQueueItems }),
+          ...(showInboxData && { activeInboxItems, activeQueueItems: formattedQueueItems }),
         };
 
         return {
