@@ -2,7 +2,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Send, Square, Info, Bot, FileText, Target, PackageCheck } from "lucide-react";
+import { Send, Square, Info, Bot, FileText, Target, PackageCheck, Mail } from "lucide-react";
 import { useLocalStorage } from "../lib/useLocalStorage.js";
 import toast from "react-hot-toast";
 import ChatSidebar from "../components/chat/ChatSidebar.jsx";
@@ -289,6 +289,11 @@ const ChatPage = () => {
                     icon: PackageCheck,
                     label: "Fulfillment Check",
                     message: "Analyze our fulfillment capability for opportunity ",
+                  },
+                  {
+                    icon: Mail,
+                    label: "Draft Outreach",
+                    message: "Draft an outreach email for inbox item ",
                   },
                 ].map(({ icon: Icon, label, message }) => (
                   <button

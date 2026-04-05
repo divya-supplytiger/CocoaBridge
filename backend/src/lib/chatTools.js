@@ -99,10 +99,27 @@ export const chatTools = {
       keyword: z.string().optional().describe("Searches linked opportunity/industry day text"),
       opportunityId: z.string().optional().describe("Filter by opportunity"),
       buyingOrgId: z.string().optional().describe("Filter by buying org"),
+      includeInboxContacts: z.boolean().optional().describe("Include contacts linked to inbox items (excluded by default)"),
       limit: z.number().optional().describe("Max results (default 20, max 50)"),
       offset: z.number().optional().describe("Pagination offset"),
     }),
     execute: (args) => callMcpTool("search_contacts", args),
+  }),
+
+  search_inbox_opportunities: tool({
+    description:
+      "Search scored, pre-filtered opportunities across the confirmed inbox (InboxItem) and/or scoring queue (ScoringQueue). Returns each result with score, matched signals, inline contacts, and buying org. Use this to answer questions like 'is anyone seeking vendors for PSC 8925?' or 'what active pursuits do we have?'",
+    parameters: z.object({
+      psc: z.string().optional().describe("Filter by PSC code"),
+      naics: z.string().optional().describe("Filter by NAICS code"),
+      keyword: z.string().optional().describe("Case-insensitive match on title"),
+      source: z.enum(["INBOX", "QUEUE", "ALL"]).optional().describe("INBOX (confirmed), QUEUE (pending review), or ALL (default)"),
+      reviewStatus: z.enum(["NEW", "IN_REVIEW", "QUALIFIED", "DISMISSED", "CONTACTED", "CLOSED"]).optional().describe("Filter INBOX items by review status"),
+      minScore: z.number().optional().describe("Minimum score"),
+      limit: z.number().optional().describe("Max results (default 20, max 50)"),
+      offset: z.number().optional().describe("Pagination offset"),
+    }),
+    execute: (args) => callMcpTool("search_inbox_opportunities", args),
   }),
 
   score_opportunity: tool({
@@ -182,6 +199,15 @@ export const chatTools = {
       opportunityId: z.string().describe("The opportunity ID to analyze for fulfillment capability"),
     }),
     execute: (args) => callMcpTool("analyze_fulfillment", args),
+  }),
+
+  generate_outreach_draft: tool({
+    description:
+      "Draft a professional outreach email to the contracting POC for a confirmed inbox item, using SupplyTiger's company profile and the opportunity details. Use when the user wants to initiate contact with a buying organization for an active pursuit.",
+    parameters: z.object({
+      inboxItemId: z.string().describe("The inbox item ID to draft outreach for"),
+    }),
+    execute: (args) => callMcpTool("generate_outreach_draft", args),
   }),
 
   get_calendar_events: tool({
