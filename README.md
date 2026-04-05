@@ -15,6 +15,26 @@ The system is designed to:
 
 ---
 
+## Recent Changes
+
+### MCP Server — Submission Tracking & Outreach
+
+- **New tool: `search_inbox_opportunities`** — searches the active pursuit pipeline (InboxItems + ScoringQueue) with filters for PSC, NAICS, keyword, review status, and minimum score; returns inline contacts merged from both the item and its linked opportunity
+- **New tool: `generate_outreach_draft`** — prompt-flow tool that drafts a professional outreach email to the contracting POC for an inbox item; fetches contacts from the linked opportunity (SAM.gov) and any inbox-specific contacts, deduplicates, and injects NSN/signal data
+- **Updated `get_opportunity`** — response now includes `inboxStatus` (in-inbox flag, review status, attachment score, matched signals, queue score, expiry)
+- **Updated `get_award`** — response now includes `inboxStatus` (in-inbox flag, review status, attachment score, matched signals)
+- **Updated `score_opportunity`** — after scoring, performs a parallel lookup and appends `inboxStatus` to show whether the opportunity is already tracked
+- **Updated `search_contacts`** — added `includeInboxContacts` boolean; when `true`, includes contacts attached directly to inbox items (previously always excluded)
+- **Updated `get_intelligence_summary`** — when filtering by `buyingOrgId`, now expands the query to cover all child and grandchild offices (2 levels deep), so award and opportunity counts reflect the full agency hierarchy rather than just the top-level node; `topBuyingOrgs` always shown; inbox items and queue entries included for org-only queries
+- **Updated prompt builders** (`generate_bid_draft`, `analyze_opportunity_fit`, `analyze_fulfillment`) — all three now load and inject the opportunity's current pipeline scoring context (inbox review status, queue score, matched NSN signals) when available
+
+### Frontend — UI Consistency
+
+- Replaced all inline confirm dialogs with the shared `ConfirmModal` component across `InboxItemDetail`, `ContactDetail`, `ContactsPage`, and `InboxPage` (including bulk-delete confirmation with dynamic item count)
+- Added **Draft Outreach** prompt starter button to `ChatPage`
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -259,30 +279,36 @@ SupplyTigerGOA/
 
 The MCP (Model Context Protocol) server acts as the **sole data access layer for all AI interactions**, providing a clean separation between the chat interface and the database.
 
-### Tools (17)
+### Tools (19)
 
 | Tool | Description |
 |------|-------------|
 | `search_opportunities` | Find procurement opportunities by keyword, type, NAICS, PSC, state, or active status |
-| `get_opportunity` | Retrieve full details of a single opportunity by ID |
+| `get_opportunity` | Retrieve full details of a single opportunity by ID, including `inboxStatus` (pipeline score, review status, matched signals) |
 | `search_awards` | Search federal contract awards by keyword, NAICS, PSC, recipient, buying org, or amount range |
-| `get_award` | Retrieve full details of a single award by ID |
+| `get_award` | Retrieve full details of a single award by ID, including `inboxStatus` |
 | `search_buying_orgs` | Search government buying organizations by name or hierarchy level |
 | `get_buying_org` | Get buying org details including parent, children, and counts |
 | `search_recipients` | Find award recipients (prime contractors) by name or UEI |
-| `search_contacts` | Find contacts linked to opportunities, buying orgs, or industry days |
+| `search_contacts` | Find contacts linked to opportunities, buying orgs, or industry days; `includeInboxContacts` flag exposes manually-added inbox contacts |
+| `search_inbox_opportunities` | Search the active pursuit pipeline — InboxItems and ScoringQueue entries — by PSC, NAICS, keyword, review status, or minimum score; returns inline contacts |
 | `search_publog_items` | Search federal supply items by keyword, PSC, NIIN, or NSN from DLA Publog data |
 | `get_cid_spec` | Look up USDA Commercial Item Description (CID) specs by CID code or PSC code |
 | `get_analytics_summary` | High-level database summary: totals, top agencies, recent opportunities |
-| `score_opportunity` | Score an opportunity against SupplyTiger's company profile (HIGH/MEDIUM/LOW fit) |
-| `get_intelligence_summary` | Deep procurement intelligence for a NAICS code, PSC code, or buying org |
+| `score_opportunity` | Score an opportunity against SupplyTiger's company profile (HIGH/MEDIUM/LOW fit); response includes `inboxStatus` showing whether the opportunity is already in the inbox or queue |
+| `get_intelligence_summary` | Deep procurement intelligence for a NAICS code, PSC code, or buying org; when filtering by org, expands the query to include all child and grandchild offices |
 | `generate_bid_draft` | Generate a structured draft bid/proposal for a specific opportunity |
 | `analyze_opportunity_fit` | Analyze competitive landscape, incumbents, and recommend GO/NO-GO/CONDITIONAL |
 | `analyze_fulfillment` | Determine FULL/PARTIAL/NO-BID based on capabilities, CLIN structure, and PSC/NAICS alignment |
+| `generate_outreach_draft` | Draft a professional outreach email to the contracting POC for an active inbox item |
 
 ### Prompt Tools
 
-The three `generate_*` / `analyze_*` tools are **prompt-flow tools** — they assemble rich context (opportunity data, company profile, CID specs, buying history) into structured prompts that the AI model executes as instructions. Each returns a preamble that forces the model to produce a full analysis rather than summarizing.
+The `generate_*` / `analyze_*` tools are **prompt-flow tools** — they assemble rich context (opportunity data, company profile, CID specs, buying history, pipeline score) into structured prompts that the AI model executes as instructions. Each returns a preamble that forces the model to produce a full analysis rather than summarizing.
+
+`generate_bid_draft`, `analyze_opportunity_fit`, and `analyze_fulfillment` all inject the opportunity's current **pipeline scoring context** (inbox review status, queue score, matched NSN signals) when available, giving the model insight into SupplyTiger's internal assessment.
+
+`generate_outreach_draft` fetches the inbox item's linked opportunity contacts (from SAM.gov) and any manually-added inbox contacts, deduplicates them, and includes NSN/signal data to ground the email in SupplyTiger's supply capability.
 
 ### Resources
 
@@ -313,6 +339,7 @@ The `/chat` page provides an AI-powered procurement intelligence assistant acces
 - **Privacy controls** — conversations can be toggled between private and shared
 - **14-day retention** — conversations auto-expire after 14 days
 - **Persistence** — conversations and messages stored in a separate `chat` schema in PostgreSQL
+- **Prompt starters** — four quick-launch buttons on the chat page: Analyze Fit, Draft Bid, Analyze Fulfillment, and **Draft Outreach** (pre-fills the outreach draft prompt for an active inbox item)
 
 ---
 
