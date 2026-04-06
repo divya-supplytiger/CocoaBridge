@@ -36,6 +36,7 @@ const ADMIN_TABS = [
   { value: "sync", label: "Sync" },
   { value: "health", label: "Health" },
   { value: "filters", label: "Filters" },
+  { value: "parsedDocs", label: "Parsed Docs" },
 ];
 
 const timeAgo = (dateStr) => {
@@ -667,6 +668,151 @@ const AccessControl = () => {
   );
 };
 
+// ─── Parsed Documents Panel ──────────────────────────────────────────────────
+
+const PARSED_DOC_FILTER_TABS = [
+  { value: "all", label: "All" },
+  { value: "unparsed", label: "Unparsed" },
+  { value: "unscored", label: "Unscored" },
+  { value: "parsed", label: "Parsed" },
+  { value: "scored", label: "Scored" },
+];
+
+const formatSize = (bytes) => {
+  if (!bytes) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const ParsedDocumentsPanel = () => {
+  const [filter, setFilter] = useState("all");
+  const [page, setPage] = useState(1);
+
+  const { data: stats } = useQuery({
+    queryKey: ["parsedDocumentStats"],
+    queryFn: adminApi.getParsedDocumentStats,
+    refetchInterval: 60000,
+  });
+
+  const { data: resources, isLoading } = useQuery({
+    queryKey: ["parsedDocuments", filter, page],
+    queryFn: () => adminApi.listParsedDocuments({ filter, page, limit: 25 }),
+  });
+
+  const statTiles = stats
+    ? [
+        { label: "Total", value: stats.total },
+        { label: "Parsed", value: stats.parsed },
+        { label: "Unparsed", value: stats.unparsed },
+        { label: "Scored", value: stats.scored },
+        { label: "Unscored", value: stats.unscored },
+      ]
+    : [];
+
+  return (
+    <div className="flex flex-col gap-4">
+      {statTiles.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          {statTiles.map(({ label, value }) => (
+            <div key={label} className="card card-compact bg-accent-content/10">
+              <div className="card-body items-center text-center gap-0">
+                <p className="text-lg font-semibold">{value.toLocaleString()}</p>
+                <p className="text-sm opacity-60">{label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="join flex-wrap">
+        {PARSED_DOC_FILTER_TABS.map(({ value, label }) => (
+          <button
+            key={value}
+            className={`join-item btn btn-sm ${filter === value ? "btn-primary" : "btn-ghost hover:bg-accent-content/40 border border-accent-content/40"}`}
+            onClick={() => { setFilter(value); setPage(1); }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-8">
+          <Loader2 className="size-6 animate-spin opacity-50" />
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="overflow-x-auto">
+            <table className="table table-sm">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Opportunity</th>
+                  <th>Size</th>
+                  <th>Parsed</th>
+                  <th>Scored</th>
+                  <th>Added</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resources?.items?.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="text-center opacity-50 py-4">No resources</td>
+                  </tr>
+                )}
+                {resources?.items?.map((r) => (
+                  <tr key={r.id}>
+                    <td className="max-w-xs text-sm font-medium">
+                      <span className="truncate block max-w-[16rem]" title={r.name}>{r.name}</span>
+                    </td>
+                    <td className="text-sm opacity-70">
+                      <span className="truncate block max-w-[14rem]" title={r.opportunity?.title ?? undefined}>
+                        {r.opportunity?.solicitationNumber ?? r.opportunity?.title ?? "—"}
+                      </span>
+                    </td>
+                    <td className="text-sm opacity-60 whitespace-nowrap">{formatSize(r.size)}</td>
+                    <td>
+                      {r.parsedAt ? (
+                        <span className="badge badge-success badge-sm gap-1">
+                          <CheckCircle className="size-3" />{timeAgo(r.parsedAt)}
+                        </span>
+                      ) : (
+                        <span className="badge badge-ghost badge-sm">Not parsed</span>
+                      )}
+                    </td>
+                    <td>
+                      {r.scoredAt ? (
+                        <span className="badge badge-success badge-sm gap-1">
+                          <CheckCircle className="size-3" />{timeAgo(r.scoredAt)}
+                        </span>
+                      ) : (
+                        <span className="badge badge-ghost badge-sm">Not scored</span>
+                      )}
+                    </td>
+                    <td className="text-sm opacity-60 whitespace-nowrap">
+                      {new Date(r.createdAt).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {resources?.totalPages > 1 && (
+            <PaginationButton
+              totalPages={resources.totalPages}
+              currentPage={page}
+              onPageChange={setPage}
+              size="sm"
+              justify="center"
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── AdminPage ────────────────────────────────────────────────────────────────
 
 const TAB_CONTENT = {
@@ -675,6 +821,7 @@ const TAB_CONTENT = {
   sync: { title: "Manual Sync", description: "Trigger a data sync on demand without waiting for the scheduled cron." },
   health: { title: "Health" },
   filters: { title: "Filter Configuration", description: "Manage the keywords and codes used to filter SAM.gov and USASpending syncs. Changes take effect on the next sync run." },
+  parsedDocs: { title: "Parsed Documents", description: "Attachment files collected from SAM.gov opportunities — view parse and score status across all records." },
 };
 
 const AdminPage = () => {
@@ -703,6 +850,7 @@ const AdminPage = () => {
             </div>
           )}
           {activeTab === "filters" && <FilterConfig />}
+          {activeTab === "parsedDocs" && <ParsedDocumentsPanel />}
         </div>
       </section>
     </div>

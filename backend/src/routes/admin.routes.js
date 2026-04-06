@@ -9,6 +9,8 @@ import {
   getFilterConfig,
   getPublicConfig,
   updateFilterConfig,
+  getParsedDocumentStats,
+  listParsedDocuments,
 } from "../controllers/admin.controller.js";
 
 export const router = express.Router();
@@ -30,3 +32,7 @@ router.post("/sync/:type", ...protectRoute, adminOnly, triggerSync);
 router.get("/config/public", ...protectRoute, getPublicConfig);
 router.get("/config", ...protectRoute, adminOnly, getFilterConfig);
 router.put("/config/:key", ...protectRoute, adminOnly, updateFilterConfig);
+
+// Parsed Documents (OpportunityAttachment)
+router.get("/parsed-documents/stats", ...protectRoute, adminOnly, getParsedDocumentStats);
+router.get("/parsed-documents", ...protectRoute, adminOnly, listParsedDocuments);

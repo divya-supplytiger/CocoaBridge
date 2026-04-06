@@ -368,6 +368,77 @@ export const getPublicConfig = async (req, res) => {
   }
 };
 
+// ─── Parsed Documents (OpportunityAttachment) ────────────────────────────────
+
+const PARSED_DOCUMENT_FILTERS = {
+  all: {},
+  unparsed: { parsedAt: null },
+  parsed: { parsedAt: { not: null } },
+  scored: { scoredAt: { not: null } },
+  unscored: { parsedAt: { not: null }, scoredAt: null }, // parsed but not yet scored
+};
+
+export const getParsedDocumentStats = async (req, res) => {
+  try {
+    const [total, parsed, scored] = await Promise.all([
+      prisma.opportunityAttachment.count(),
+      prisma.opportunityAttachment.count({ where: { parsedAt: { not: null } } }),
+      prisma.opportunityAttachment.count({ where: { scoredAt: { not: null } } }),
+    ]);
+    return res.status(200).json({
+      total,
+      parsed,
+      unparsed: total - parsed,
+      scored,
+      unscored: total - scored,
+    });
+  } catch (error) {
+    console.error("Error fetching parsed document stats:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const listParsedDocuments = async (req, res) => {
+  const { page = "1", limit = "25", filter = "all" } = req.query;
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const take = Math.min(50, Math.max(1, parseInt(limit, 10) || 25));
+  const skip = (pageNum - 1) * take;
+  const where = PARSED_DOCUMENT_FILTERS[filter] ?? {};
+
+  try {
+    const [total, items] = await Promise.all([
+      prisma.opportunityAttachment.count({ where }),
+      prisma.opportunityAttachment.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          name: true,
+          mimeType: true,
+          size: true,
+          parsedAt: true,
+          scoredAt: true,
+          createdAt: true,
+          opportunity: {
+            select: { id: true, title: true, solicitationNumber: true },
+          },
+        },
+      }),
+    ]);
+    return res.status(200).json({
+      total,
+      page: pageNum,
+      totalPages: Math.max(1, Math.ceil(total / take)),
+      items,
+    });
+  } catch (error) {
+    console.error("Error listing parsed documents:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 export const updateFilterConfig = async (req, res) => {
   const { key } = req.params;
   const { values } = req.body;

@@ -239,6 +239,15 @@ export const adminApi = {
     const { data } = await axiosInstance.get("/admin/stats");
     return data;
   },
+  // Parsed Documents — OpportunityAttachment overview (admin only)
+  getParsedDocumentStats: async () => {
+    const { data } = await axiosInstance.get("/admin/parsed-documents/stats");
+    return data;
+  },
+  listParsedDocuments: async (params) => {
+    const { data } = await axiosInstance.get("/admin/parsed-documents", { params });
+    return data;
+  },
   // Filter configuration (admin only)
   getFilterConfig: async () => {
     const { data } = await axiosInstance.get("/admin/config");

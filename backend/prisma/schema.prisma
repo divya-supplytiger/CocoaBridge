@@ -344,6 +344,9 @@ model OpportunityAttachment {
 
   @@index([opportunityId])
   @@index([name])
+  @@index([parsedAt])
+  @@index([scoredAt])
+  @@index([createdAt])
   @@schema("public")
 }
 
