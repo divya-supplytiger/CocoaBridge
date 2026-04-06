@@ -14,7 +14,7 @@ const SearchBar = ({ onSearch, placeholder = "Search...", className = "" }) => {
     setSearch(value);
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      onSearch(value);
+      onSearch(value.trim());
     }, 300);
   }, [onSearch]);
 
