@@ -108,6 +108,7 @@ const OutreachLog = ({ contactId }) => {
           </div>
         )}
 
+
         {isLoading ? (
           <div className="flex justify-center py-4">
             <span className="loading loading-spinner loading-sm opacity-50" />
