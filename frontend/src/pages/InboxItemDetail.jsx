@@ -3,14 +3,13 @@ import { useParams, useNavigate, Link } from 'react-router';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Trash2, Trophy, Handshake, FileDown } from "lucide-react";
 import toast from "react-hot-toast";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { dbApi } from "../lib/api.js";
 import { useCurrentUser } from "../lib/CurrentUserContext.jsx";
 import ItemDetail from "../components/ItemDetail.jsx";
 import SignalPills from "../components/SignalPills.jsx";
 import ConfirmModal from "../components/ConfirmModal.jsx";
 import { exportDetailToCsv, csvFilename } from "../lib/csvExport.js";
+import NoteLog from "../components/NoteLog.jsx";
 
 const STATUS_BADGE = {
   NEW: "badge-neutral",
@@ -74,7 +73,6 @@ const InboxItemDetail = () => {
       reviewStatus: item.reviewStatus,
       title: item.title ?? "",
       deadline: deadlineSource ? new Date(deadlineSource).toISOString().slice(0, 10) : "",
-      notes: item.notes ?? "",
     });
     setIsEditing(true);
   };
@@ -89,7 +87,6 @@ const InboxItemDetail = () => {
       reviewStatus: draft.reviewStatus,
       title: draft.title,
       deadline: draft.deadline ? new Date(draft.deadline).toISOString() : null,
-      notes: draft.notes,
     });
   };
 
@@ -185,13 +182,6 @@ const InboxItemDetail = () => {
               )}
                   </div>
 
-            {!isEditing && item.notes && (
-              <div>
-                <p className="font-semibold text-sm">Notes</p>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{item.notes}</ReactMarkdown>
-              </div>
-            )}
-
             {isAdmin && isEditing && (
               <>
                 <div className="flex items-center gap-2">
@@ -227,17 +217,6 @@ const InboxItemDetail = () => {
                     onChange={(e) => setDraft({ ...draft, deadline: e.target.value })}
                   />
                 </div>
-                <div className="flex flex-col gap-2">
-                  <p className="font-semibold text-sm">Notes</p>
-                  <p className="text-xs text-base-content/50">Markdown supported</p>
-                  <textarea
-                    className="textarea textarea-bordered text-sm w-full"
-                    rows={6}
-                    value={draft.notes}
-                    onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
-                    placeholder="Add notes…"
-                  />
-                </div>
                 <div className="flex gap-2 justify-end">
                   <button className="btn btn-ghost btn-sm" onClick={handleCancel}>Cancel</button>
                   <button
@@ -253,6 +232,18 @@ const InboxItemDetail = () => {
           </div>
         )}
       </ItemDetail>
+
+      {item && (
+        <NoteLog
+          title="Notes"
+          queryKey={["inboxItemNotes", id]}
+          fetchFn={() => dbApi.listInboxItemNotes(id)}
+          createFn={(text) => dbApi.createInboxItemNote(id, text)}
+          deleteFn={(noteId) => dbApi.deleteInboxItemNote(id, noteId)}
+          canAdd={isAdmin}
+          canDelete={() => isAdmin}
+        />
+      )}
 
       <ConfirmModal
         open={showDeleteConfirm}

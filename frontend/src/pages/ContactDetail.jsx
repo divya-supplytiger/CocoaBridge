@@ -9,6 +9,7 @@ import ItemDetail from "../components/ItemDetail.jsx";
 import RelatedRecordsCard from "../components/RelatedRecordsCard.jsx";
 import ConfirmModal from "../components/ConfirmModal.jsx";
 import { exportDetailToCsv, csvFilename } from "../lib/csvExport.js";
+import OutreachLog from "../components/OutreachLog.jsx";
 
 // Deduplicate ContactLink rows by the linked entity's own id.
 // The same entity can appear multiple times (once per contact role —
@@ -216,6 +217,7 @@ const ContactDetail = () => {
             buyingOrgLinks={buyingOrgLinks}
           />
         )}
+        {item && <OutreachLog contactId={id} />}
       </div>
 
       <ConfirmModal

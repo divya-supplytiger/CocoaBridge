@@ -128,6 +128,18 @@ export const dbApi = {
     const { data } = await axiosInstance.delete(`/db/contacts/${id}`);
     return data;
   },
+  listContactInteractions: async (contactId) => {
+    const { data } = await axiosInstance.get(`/db/contacts/${contactId}/interactions`);
+    return data;
+  },
+  createContactInteraction: async (contactId, body) => {
+    const { data } = await axiosInstance.post(`/db/contacts/${contactId}/interactions`, body);
+    return data;
+  },
+  deleteContactInteraction: async (contactId, interactionId) => {
+    const { data } = await axiosInstance.delete(`/db/contacts/${contactId}/interactions/${interactionId}`);
+    return data;
+  },
   // FLIS Items
   listFLISItems: async (params) => {
     const { data } = await axiosInstance.get("/db/flis-items", { params });
@@ -144,6 +156,20 @@ export const dbApi = {
   },
   toggleFavorite: async (entityType, entityId) => {
     const { data } = await axiosInstance.post("/db/favorites", { entityType, entityId });
+    return data;
+  },
+
+  // Inbox Item Notes
+  listInboxItemNotes: async (inboxItemId) => {
+    const { data } = await axiosInstance.get(`/db/inbox-items/${inboxItemId}/notes`);
+    return data;
+  },
+  createInboxItemNote: async (inboxItemId, text) => {
+    const { data } = await axiosInstance.post(`/db/inbox-items/${inboxItemId}/notes`, { text });
+    return data;
+  },
+  deleteInboxItemNote: async (inboxItemId, noteId) => {
+    const { data } = await axiosInstance.delete(`/db/inbox-items/${inboxItemId}/notes/${noteId}`);
     return data;
   },
 
