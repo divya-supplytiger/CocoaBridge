@@ -1,6 +1,8 @@
 import { z } from "zod";
 import prisma from "../db.js";
 
+const PRIORITY = { PRIMARY: 0, SECONDARY: 1, OTHER: 2 };
+
 export function registerSearchContacts(server) {
   server.registerTool(
     "search_contacts",
@@ -12,6 +14,7 @@ export function registerSearchContacts(server) {
         opportunityId: z.string().optional().describe("Filter contacts linked to a specific opportunity"),
         buyingOrgId: z.string().optional().describe("Filter contacts linked to a specific buying org"),
         includeInboxContacts: z.boolean().optional().describe("Include contacts linked to inbox items (excluded by default)"),
+        contactType: z.enum(["PRIMARY", "SECONDARY", "OTHER"]).optional().describe("Filter by contact link type (PRIMARY, SECONDARY, or OTHER)"),
         limit: z.number().optional().describe("Max results (default 20, max 50)"),
         offset: z.number().optional().describe("Number of results to skip for pagination (default 0)"),
       },
@@ -22,17 +25,22 @@ export function registerSearchContacts(server) {
         openWorldHint: false,
       },
     },
-    async ({ keyword, opportunityId, buyingOrgId, includeInboxContacts, limit: rawLimit, offset: rawOffset }) => {
+    async ({ keyword, opportunityId, buyingOrgId, includeInboxContacts, contactType, limit: rawLimit, offset: rawOffset }) => {
       try {
         const limit = Math.min(Math.max(rawLimit ?? 20, 1), 50);
         const offset = Math.max(rawOffset ?? 0, 0);
 
-        const where = includeInboxContacts ? {} : { inboxItemId: null };
+        const where = {
+          ...(includeInboxContacts ? {} : { inboxItemId: null }),
+          ...(opportunityId && { opportunityId }),
+          ...(buyingOrgId && { buyingOrganizationId: buyingOrgId }),
+          ...(contactType && { type: contactType }),
+        };
 
-        if (opportunityId) where.opportunityId = opportunityId;
-        if (buyingOrgId) where.buyingOrganizationId = buyingOrgId;
         if (keyword) {
           where.OR = [
+            { contact: { fullName: { contains: keyword, mode: "insensitive" } } },
+            { contact: { email: { contains: keyword, mode: "insensitive" } } },
             { opportunity: { title: { contains: keyword, mode: "insensitive" } } },
             { opportunity: { description: { contains: keyword, mode: "insensitive" } } },
             { industryDay: { title: { contains: keyword, mode: "insensitive" } } },
@@ -40,23 +48,44 @@ export function registerSearchContacts(server) {
           ];
         }
 
-        const [totalCount, links] = await Promise.all([
-          prisma.contactLink.count({ where }),
-          prisma.contactLink.findMany({
-            where,
-            include: {
-              contact: true,
-              opportunity: { select: { id: true, title: true } },
-              industryDay: { select: { id: true, title: true } },
-              buyingOrganization: { select: { id: true, name: true } },
-              inboxItem: { select: { id: true, title: true } },
-            },
-            take: limit,
-            skip: offset,
-          }),
-        ]);
+        const includeClause = {
+          contact: true,
+          opportunity: { select: { id: true, title: true } },
+          industryDay: { select: { id: true, title: true } },
+          buyingOrganization: { select: { id: true, name: true } },
+          inboxItem: { select: { id: true, title: true } },
+        };
 
-        const results = links.map((link) => {
+        let raw, totalCount;
+
+        if (contactType) {
+          // With a type filter, paginate at DB level — no deduplication needed
+          [totalCount, raw] = await Promise.all([
+            prisma.contactLink.count({ where }),
+            prisma.contactLink.findMany({
+              where,
+              include: includeClause,
+              take: limit,
+              skip: offset,
+            }),
+          ]);
+        } else {
+          // Without type filter, fetch all and deduplicate by contactId (highest-priority type wins)
+          const allLinks = await prisma.contactLink.findMany({ where, include: includeClause });
+
+          const byContact = new Map();
+          for (const link of allLinks) {
+            const existing = byContact.get(link.contactId);
+            if (!existing || PRIORITY[link.type] < PRIORITY[existing.type]) {
+              byContact.set(link.contactId, link);
+            }
+          }
+          const deduped = [...byContact.values()];
+          totalCount = deduped.length;
+          raw = deduped.slice(offset, offset + limit);
+        }
+
+        const results = raw.map((link) => {
           const { contact } = link;
           let linkedTo;
           if (link.inboxItem) {
