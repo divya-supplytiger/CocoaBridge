@@ -532,7 +532,15 @@ export const getInboxItem = async (req, res) => {
   try {
     const item = await prisma.inboxItem.findUnique({
       where: { id: req.params.id },
-      include: { opportunity: true, award: true, contactLinks: true },
+      include: {
+        opportunity: true,
+        award: true,
+        contactLinks: true,
+        notes: {
+          include: { user: { select: { id: true, name: true } } },
+          orderBy: { createdAt: "desc" },
+        },
+      },
     });
     if (!item) return res.status(404).json({ error: "InboxItem not found" });
     return res.status(200).json({ data: item });

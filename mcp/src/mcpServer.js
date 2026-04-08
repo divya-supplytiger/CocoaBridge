@@ -18,6 +18,7 @@ import { registerGetCidSpec } from "./tools/getCidSpec.js";
 import { registerGetAttachmentText } from "./tools/getAttachmentText.js";
 import { registerGetCalendarEvents } from "./tools/getCalendarEvents.js";
 import { registerSearchInboxOpportunities } from "./tools/searchInboxOpportunities.js";
+import { registerGetInboxItem } from "./tools/getInboxItem.js";
 import { registerResources } from "./resourcesConfig.js";
 import { registerPrompts } from "./prompts.js";
 import { registerPromptTools } from "./tools/promptTools.js";
@@ -53,6 +54,7 @@ export function createMcpServer() {
   registerGetAttachmentText(server);
   registerGetCalendarEvents(server);
   registerSearchInboxOpportunities(server);
+  registerGetInboxItem(server);
   registerResources(server);
   registerPrompts(server);
   registerPromptTools(server);

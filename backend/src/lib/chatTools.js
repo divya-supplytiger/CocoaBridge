@@ -157,6 +157,17 @@ export const chatTools = {
     execute: (args) => callMcpTool("search_inbox_opportunities", args),
   }),
 
+  get_inbox_item: tool({
+    description:
+      "Retrieve full details of a single inbox item by ID, including score, matched signals, buying org, contacts, linked opportunity, and paginated logged notes.",
+    parameters: z.object({
+      inboxItemId: z.string().describe("Inbox item ID"),
+      limit: z.number().optional().describe("Max notes to return (default 20, max 50)"),
+      offset: z.number().optional().describe("Notes pagination offset (default 0)"),
+    }),
+    execute: (args) => callMcpTool("get_inbox_item", args),
+  }),
+
   score_opportunity: tool({
     description:
       "Score a procurement opportunity against SupplyTiger's company profile. Returns HIGH/MEDIUM/LOW fit.",

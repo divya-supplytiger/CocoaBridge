@@ -81,6 +81,11 @@ export function registerSearchInboxOpportunities(server) {
               opportunity: { select: OPPORTUNITY_SELECT },
               buyingOrganization: { select: { name: true } },
               contactLinks: { include: CONTACT_SELECT },
+              notes: {
+                include: { user: { select: { name: true } } },
+                orderBy: { createdAt: "desc" },
+                take: 5,
+              },
             },
             orderBy: { attachmentScore: "desc" },
           });
@@ -99,6 +104,12 @@ export function registerSearchInboxOpportunities(server) {
               reviewStatus: item.reviewStatus,
               buyingOrg: item.buyingOrganization?.name ?? null,
               contacts: item.contactLinks.map(formatContact),
+              notes: item.notes.map((n) => ({
+                id: n.id,
+                text: n.text,
+                loggedBy: n.user?.name ?? null,
+                createdAt: n.createdAt,
+              })),
             });
           }
         }
