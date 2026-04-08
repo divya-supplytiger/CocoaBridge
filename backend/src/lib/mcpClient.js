@@ -67,4 +67,3 @@ export async function callMcpTool(toolName, args) {
     return text;
   }
 }
-
