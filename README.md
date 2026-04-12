@@ -15,26 +15,6 @@ The system is designed to:
 
 ---
 
-## Recent Changes
-
-### MCP Server — Submission Tracking & Outreach
-
-- **New tool: `search_inbox_opportunities`** — searches the active pursuit pipeline (InboxItems + ScoringQueue) with filters for PSC, NAICS, keyword, review status, and minimum score; returns inline contacts merged from both the item and its linked opportunity
-- **New tool: `generate_outreach_draft`** — prompt-flow tool that drafts a professional outreach email to the contracting POC for an inbox item; fetches contacts from the linked opportunity (SAM.gov) and any inbox-specific contacts, deduplicates, and injects NSN/signal data
-- **Updated `get_opportunity`** — response now includes `inboxStatus` (in-inbox flag, review status, attachment score, matched signals, queue score, expiry)
-- **Updated `get_award`** — response now includes `inboxStatus` (in-inbox flag, review status, attachment score, matched signals)
-- **Updated `score_opportunity`** — after scoring, performs a parallel lookup and appends `inboxStatus` to show whether the opportunity is already tracked
-- **Updated `search_contacts`** — added `includeInboxContacts` boolean; when `true`, includes contacts attached directly to inbox items (previously always excluded)
-- **Updated `get_intelligence_summary`** — when filtering by `buyingOrgId`, now expands the query to cover all child and grandchild offices (2 levels deep), so award and opportunity counts reflect the full agency hierarchy rather than just the top-level node; `topBuyingOrgs` always shown; inbox items and queue entries included for org-only queries
-- **Updated prompt builders** (`generate_bid_draft`, `analyze_opportunity_fit`, `analyze_fulfillment`) — all three now load and inject the opportunity's current pipeline scoring context (inbox review status, queue score, matched NSN signals) when available
-
-### Frontend — UI Consistency
-
-- Replaced all inline confirm dialogs with the shared `ConfirmModal` component across `InboxItemDetail`, `ContactDetail`, `ContactsPage`, and `InboxPage` (including bulk-delete confirmation with dynamic item count)
-- Added **Draft Outreach** prompt starter button to `ChatPage`
-
----
-
 ## Tech Stack
 
 | Layer | Technology |
@@ -127,6 +107,11 @@ MCP_SECRET=your_mcp_shared_secret
 # AI model
 GEMINI_API_KEY=your_gemini_api_key
 
+# Email (Resend)
+RESEND_API_KEY=your_resend_api_key
+RESEND_FROM=noreply@yourdomain.com
+DIGEST_HMAC_SECRET=your_digest_hmac_secret
+
 # Admin access — comma-separated emails that auto-receive ADMIN role on signup
 ADMIN_EMAILS=admin@example.com,another@example.com
 ```
@@ -210,9 +195,12 @@ SupplyTigerGOA/
 │       │   └── inngestClient.js  # Inngest client setup
 │       ├── controllers/
 │       │   ├── admin.controller.js      # Admin: user mgmt, sync triggers, health
+│       │   ├── analytics.controller.js  # Analytics aggregation endpoints
+│       │   ├── chat.controller.js       # Chat: conversation + message handlers
 │       │   ├── db.controller.js         # DB CRUD + Clerk user sync
 │       │   ├── sam.controller.js        # SAM.gov API integration
-│       │   └── usaspending.controller.js # USASpending API integration
+│       │   ├── scoringQueue.controller.js # Scoring queue approve/dismiss/manual score
+│       │   └── usaspending.controller.js  # USASpending API integration
 │       ├── lib/
 │       │   ├── chatTools.js             # AI tool definitions bridging to MCP
 │       │   ├── mcpClient.js             # MCP server client bridge
@@ -223,7 +211,9 @@ SupplyTigerGOA/
 │       │   ├── admin.routes.js          # /api/admin/*
 │       │   ├── chat.routes.js           # /api/chat/*
 │       │   ├── db.routes.js             # /api/db/*
+│       │   ├── digest.routes.js         # /api/digest/* (HMAC-protected unsubscribe)
 │       │   ├── sam.routes.js            # /api/samgov/*
+│       │   ├── scoringQueue.routes.js   # /api/db/scoring-queue/* + manual score
 │       │   └── usaspending.routes.js    # /api/usaspending/*
 │       └── utils/
 │           ├── extractSAM.js
@@ -234,39 +224,64 @@ SupplyTigerGOA/
         ├── App.jsx               # Routes with role-based guards
         ├── main.jsx              # React entry point (Clerk + React Query)
         ├── components/
-        │   ├── Navbar.jsx
-        │   ├── Sidebar.jsx               # Role-aware nav (hides Admin for non-admins)
-        │   ├── NavigationLinks.jsx
-        │   ├── SearchBar.jsx             # Debounced search input (300ms), shared across pages
-        │   ├── Table.jsx                 # Paginated data table with clickable rows
-        │   ├── Row.jsx                   # Single table row
+        │   ├── AddToInboxModal.jsx       # Modal to manually add opp/award to inbox
+        │   ├── ConfirmModal.jsx          # Shared confirmation dialog (replaces inline confirm)
+        │   ├── ExportToolbar.jsx         # Row export controls
+        │   ├── FavoriteButton.jsx        # Star toggle; optimistic UI; opps + awards
+        │   ├── Footer.jsx
         │   ├── ItemDetail.jsx            # Shared detail card (title, badges, fields, children)
+        │   ├── ListEditors.jsx           # Editable list UI for admin config
+        │   ├── ManualScoreModal.jsx      # Two-step manual scoring modal for no-attachment opps
+        │   ├── Modal.jsx                 # Reusable DaisyUI modal wrapper
+        │   ├── Navbar.jsx
+        │   ├── NavigationLinks.jsx
+        │   ├── NoteLog.jsx               # Logged notes panel for inbox items
+        │   ├── OutreachLog.jsx           # Outreach interaction log panel for contacts
+        │   ├── PageLoader.jsx            # Full-page loading spinner
+        │   ├── PaginationButton.jsx      # Standalone pagination control
+        │   ├── ParsedTextModal.jsx       # Attachment parse/preview/save modal
         │   ├── RelatedRecordsCard.jsx    # Linked records panel (opps, awards, orgs, contacts)
-        │   ├── Modal.jsx                 # Reusable DaisyUI modal wrapper (open, onClose, title, children)
-        │   ├── ParsedTextModal.jsx       # Attachment parse/preview/save modal with preview-then-save flow
-        │   ├── FavoriteButton.jsx        # Star toggle button; optimistic UI; works on opportunities + awards
+        │   ├── Row.jsx                   # Single table row
+        │   ├── SearchBar.jsx             # Debounced search input (300ms), shared across pages
+        │   ├── Sidebar.jsx               # Role-aware nav (hides Admin for non-admins)
+        │   ├── SignalPills.jsx           # Signal badge display for matched scoring signals
+        │   ├── Table.jsx                 # Paginated data table with clickable rows
         │   ├── TabsJoinButton.jsx        # Reusable DaisyUI join-style tab switcher
-        │   ├── ChatMessage.jsx           # Message rendering with tool invocations
-        │   └── ChatSidebar.jsx           # Conversation list with delete/rename
+        │   ├── calendar/
+        │   │   └── MonthGrid.jsx         # Month-view calendar grid
+        │   ├── chat/
+        │   │   ├── ChatMessage.jsx       # Message rendering with tool invocations
+        │   │   └── ChatSidebar.jsx       # Conversation list with delete/rename
+        │   └── dashboard/
+        │       ├── KpiSection.jsx
+        │       ├── RecentActivitySection.jsx
+        │       ├── UpcomingDeadlinesSection.jsx
+        │       ├── UpcomingIndustryDaysSection.jsx
+        │       └── dashboardHelpers.jsx
         ├── pages/
         │   ├── AdminPage.jsx             # User mgmt, sync controls, system health, filter config
         │   ├── AnalyticsPage.jsx         # Tabbed analytics: Top Recipients | By PSC | By NAICS | By Agency
+        │   ├── AwardDetail.jsx
+        │   ├── AwardsPage.jsx            # Tabbed: All | Favorites; filterable by search, NAICS, PSC
+        │   ├── BuyingOrgDetail.jsx       # Buying org detail; child orgs + linked opps; admin inline edit
+        │   ├── CalendarPage.jsx          # Industry day + deadline calendar
+        │   ├── ChatPage.jsx              # AI chat with conversation history & model selector
+        │   ├── ContactDetail.jsx         # Contact detail; outreach log; admin inline edit
+        │   ├── ContactsPage.jsx          # Contacts list with debounced search
         │   ├── DashboardLayout.jsx
         │   ├── DashboardPage.jsx         # KPI cards, recent activity, upcoming deadlines, industry days
+        │   ├── FLISItemDetail.jsx        # FLIS/Publog supply item detail page
+        │   ├── FavoritesPage.jsx         # User's starred opportunities and awards
+        │   ├── InboxItemDetail.jsx       # Inbox detail; notes log; admin status edit; linked opp/award
         │   ├── InboxPage.jsx             # Inbox list; admin status dropdown + delete
-        │   ├── InboxItemDetail.jsx       # Inbox detail; admin notes + status edit; read-only can view linked opp/award
+        │   ├── IndustryDayDetail.jsx     # Industry day detail page
+        │   ├── LoginPage.jsx             # Sign-in page
+        │   ├── MarketIntelligencePage.jsx # Tabbed view: Recipients | Buying Agencies
+        │   ├── NotFoundPage.jsx          # 404 page
         │   ├── OpportunitiesPage.jsx
         │   ├── OpportunityDetail.jsx
-        │   ├── AwardsPage.jsx            # Tabbed: All | Favorites; filterable by search, NAICS, PSC
-        │   ├── AwardDetail.jsx
-        │   ├── ContactsPage.jsx          # Contacts list with debounced search
-        │   ├── ContactDetail.jsx         # Contact detail; admin inline edit (phone, title); phone as tel: link
-        │   ├── MarketIntelligencePage.jsx # Tabbed view: Recipients | Buying Agencies
-        │   ├── RecipientDetail.jsx       # Recipient detail; admin inline edit (website); website as external link
-        │   ├── BuyingOrgDetail.jsx       # Buying org detail; child orgs + linked opps; admin inline edit (website)
-        │   ├── ChatPage.jsx              # AI chat with conversation history & model selector
-        │   ├── CalendarPage.jsx          # Industry day calendar
-        │   └── FavoritesPage.jsx         # User's starred opportunities and awards
+        │   ├── RecipientDetail.jsx       # Recipient detail; admin inline edit (website)
+        │   └── WeeklyMetricsPage.jsx     # Weekly pipeline metrics dashboard
         └── lib/
             ├── api.js            # dbApi + chatApi + adminApi fetch functions
             ├── axios.js          # Axios instance with base URL
@@ -279,7 +294,7 @@ SupplyTigerGOA/
 
 The MCP (Model Context Protocol) server acts as the **sole data access layer for all AI interactions**, providing a clean separation between the chat interface and the database.
 
-### Tools (19)
+### Tools (23)
 
 | Tool | Description |
 |------|-------------|
@@ -301,6 +316,10 @@ The MCP (Model Context Protocol) server acts as the **sole data access layer for
 | `analyze_opportunity_fit` | Analyze competitive landscape, incumbents, and recommend GO/NO-GO/CONDITIONAL |
 | `analyze_fulfillment` | Determine FULL/PARTIAL/NO-BID based on capabilities, CLIN structure, and PSC/NAICS alignment |
 | `generate_outreach_draft` | Draft a professional outreach email to the contracting POC for an active inbox item |
+| `get_inbox_item` | Retrieve full details of a single inbox item by ID, including score, matched signals, buying org, contacts, linked opportunity, and paginated logged notes |
+| `get_contact_interactions` | Returns the paginated outreach interaction log for a contact; filter by status or date; useful for reviewing outreach history before drafting a follow-up |
+| `get_calendar_events` | Returns upcoming opportunity deadlines, inbox item deadlines, and industry days for a given month/year or custom date range |
+| `get_weekly_metrics` | Returns the 5-metric pipeline report for a given ISO week (e.g. `2026-W14`); includes full records for current week and counts-only for previous week |
 
 ### Prompt Tools
 
@@ -451,6 +470,14 @@ All endpoints under `/api/db` and `/api/admin` require authentication via Clerk 
 | GET | `/api/db/analytics/naics` | READ_ONLY+ | Award spend and opportunity counts grouped by NAICS code |
 | GET | `/api/db/analytics/agencies` | READ_ONLY+ | Buying agencies ranked by opportunity count and award spend |
 
+**Scoring Queue (`/api/db/scoring-queue`)**
+
+| Method | Endpoint | Auth Required | Description |
+|--------|----------|---------------|-------------|
+| GET | `/api/db/scoring-queue` | ADMIN | List pending scoring queue entries |
+| POST | `/api/db/scoring-queue/:id/approve` | ADMIN | Approve entry — promotes to InboxItem |
+| POST | `/api/db/scoring-queue/:id/dismiss` | ADMIN | Dismiss entry |
+
 ### Chat Endpoints (`/api/chat`)
 
 | Method | Endpoint | Auth Required | Description |
@@ -478,7 +505,12 @@ All endpoints under `/api/db` and `/api/admin` require authentication via Clerk 
 | POST | `/api/admin/sync/cleanup-chats` | ADMIN | Manually trigger expired chat cleanup |
 | GET | `/api/admin/config` | ADMIN | Get all filter + access config values |
 | GET | `/api/admin/config/public` | Any authenticated | Get `chatRetentionDays` (used by chat widget) |
-| PATCH | `/api/admin/config/:key` | ADMIN | Update a config value (`solicitationKeywords`, `naicsCodes`, `pscPrefixes`, `industryDayKeywords`, `adminEmailRules`, `readOnlyEmailRules`, `chatRetentionDays`, and their bank variants) |
+| PUT | `/api/admin/config/:key` | ADMIN | Update a config value (`solicitationKeywords`, `naicsCodes`, `pscPrefixes`, `industryDayKeywords`, `adminEmailRules`, `readOnlyEmailRules`, `chatRetentionDays`, and their bank variants) |
+| GET | `/api/admin/stats` | ADMIN | Database record counts |
+| GET | `/api/admin/company-profile` | ADMIN | Get company profile resource |
+| PUT | `/api/admin/company-profile` | ADMIN | Update company profile |
+| GET | `/api/admin/parsed-documents/stats` | ADMIN | Parsed attachment statistics |
+| GET | `/api/admin/parsed-documents` | ADMIN | List parsed documents |
 
 ### SAM.gov Endpoints (`/api/samgov`)
 
@@ -503,6 +535,14 @@ All endpoints under `/api/db` and `/api/admin` require authentication via Clerk 
 | GET | `/api/usaspending/awards/:award_id` | Get award by ID |
 | GET | `/api/usaspending/awards/sync` | Sync awards to DB |
 
+### Digest Endpoints (`/api/digest`)
+
+> Not protected by Clerk JWT. Uses an HMAC token embedded in the unsubscribe URL.
+
+| Method | Endpoint | Auth Required | Description |
+|--------|----------|---------------|-------------|
+| GET | `/api/digest/unsubscribe` | None (HMAC token) | Unsubscribe a user from digest emails |
+
 ---
 
 ## Background Jobs (Inngest)
@@ -520,6 +560,7 @@ Cron jobs run automatically. All jobs write a `SyncLog` entry to the database on
 | Score New Opportunity Attachments | Daily 1:30 AM EST | Downloads + parses attachments for unprocessed PSC-matched opps; routes to inbox or scoring queue based on score |
 | Cleanup Expired Scoring Queue | Daily 2:00 AM EST | Removes PENDING scoring queue entries that have expired or belong to inactive opportunities |
 | Sync USASpending Awards | Every 3 days 1:00 AM EST | Pulls recent contract awards |
+| Send Daily Digest | Weekdays 8:00 AM EST | Sends a procurement digest email to all active users with digest enabled |
 
 **Event-driven jobs:**
 
@@ -766,10 +807,10 @@ The `/analytics` page (READ_ONLY+) provides a tabbed breakdown of contract data:
 
 ## Future Features
 
-* Daily digest emails sent to admins
+* **Scoring Gradient Descent** — Adaptive signal weights via binary logistic regression trained on labeled InboxItems. Includes a `TrainingLabel` model for manual bootstrap labels, an async training endpoint (`POST /api/admin/scoring/train`), a `ScoringModel` table storing learned weights and thresholds, and an `/ml` admin page for labeling the queue and reviewing model history. The live pipeline loads learned weights within 60 seconds of training and falls back to hardcoded defaults when no trained model exists.
+* **Ollama Model Provider** — Local/self-hosted LLM inference via `ollama-ai-provider`. When `OLLAMA_BASE_URL` is set, available Ollama models are fetched from `/api/tags`, cached for 60 seconds, and merged into the model list alongside Gemini. Each Ollama model appears in the chat dropdown with a `(Local)` suffix. Models known to support tool-calling (llama3.1+, qwen2.5, mistral, command-r) are flagged `toolCapable`. Ollama is fully optional — omitting `OLLAMA_BASE_URL` silently excludes it with no errors.
 * Quote / follow-up templates tied to opportunity records
 * GSA Advantage listing support
-* Calendar integration for industry day events
 
 ---
 

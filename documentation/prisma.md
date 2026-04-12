@@ -1,0 +1,1 @@
+# Talk about how the schema is updated (npx format, validate, migrate, deploy, generate) + how this should be done in the terminal for mcp too -- it has it's own schema that must stay alligned as well. -- workflow
