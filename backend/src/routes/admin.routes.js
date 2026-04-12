@@ -13,6 +13,7 @@ import {
   updateCompanyProfile,
   getParsedDocumentStats,
   listParsedDocuments,
+  getCleanupDbPreview,
 } from "../controllers/admin.controller.js";
 
 export const router = express.Router();
@@ -42,3 +43,6 @@ router.put("/company-profile", ...protectRoute, adminOnly, updateCompanyProfile)
 // Parsed Documents (OpportunityAttachment)
 router.get("/parsed-documents/stats", ...protectRoute, adminOnly, getParsedDocumentStats);
 router.get("/parsed-documents", ...protectRoute, adminOnly, listParsedDocuments);
+
+// Cleanup DB — preview count before running
+router.get("/cleanup-db/preview", ...protectRoute, adminOnly, getCleanupDbPreview);
