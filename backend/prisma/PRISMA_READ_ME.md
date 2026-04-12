@@ -1,5 +1,18 @@
 # Prisma Setup & Schema Update Guide
 
+## Schema Map
+
+| Section | Models |
+|---|---|
+| **Users** | User, Favorite, ChatConversation, ChatMessage |
+| **Fetched Data** | Opportunity, OpportunityAttachment, Award, IndustryDay |
+| **Reference** | BuyingOrganization, Recipient, PscClass, FederalLogisticsInformationSystem, CommercialItemDesc |
+| **Outreach** | Contact, ContactLink, ContactInteraction |
+| **Pipeline** | InboxItem, InboxItemNote |
+| **System** | ScoringQueue, SyncLog, AppConfig |
+
+---
+
 ## 1. Install Prisma
 
 ```bash

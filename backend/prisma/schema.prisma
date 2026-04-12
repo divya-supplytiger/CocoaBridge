@@ -10,98 +10,7 @@ datasource db {
   schemas  = ["public", "chat"]
 }
 
-enum UserRole {
-  ADMIN
-  READ_ONLY
-  USER
-
-  @@schema("public")
-}
-
-enum SyncStatus {
-  RUNNING
-  SUCCESS
-  PARTIAL
-  FAILED
-
-  @@schema("public")
-}
-
-enum AcquisitionPath {
-  MICROPURCHASE
-  GSA
-  OPEN_MARKET
-  SUBCONTRACTING
-
-  @@schema("public")
-}
-
-enum InboxStatus {
-  NEW
-  IN_REVIEW
-  QUALIFIED
-  DISMISSED
-  CONTACTED
-  CLOSED
-
-  @@schema("public")
-}
-
-enum Type {
-  PRE_SOLICITATION
-  AWARD_NOTICE
-  SOURCES_SOUGHT
-  SPECIAL_NOTICE
-  SOLICITATION
-  OTHER
-
-  @@schema("public")
-}
-
-enum OppTag {
-  INDUSTRY_DAY
-  GENERAL
-
-  @@schema("public")
-}
-
-enum ScoringQueueStatus {
-  PENDING
-  APPROVED
-  DISMISSED
-
-  @@schema("public")
-}
-
-enum ContactType {
-  PRIMARY
-  SECONDARY
-  OTHER
-
-  @@schema("public")
-}
-
-enum OutreachStatus {
-  SENT
-  RESPONDED
-  NO_REPLY
-  FOLLOW_UP
-  MEETING_SCHEDULED
-  CLOSED
-
-  @@schema("public")
-}
-
-enum IndustryDayStatus {
-  OPEN
-  NOT_ATTENDING
-  ATTENDING
-  ATTENDED
-  PAST_EVENT
-
-  @@schema("public")
-}
-
+// shared enum — used across Fetched Data, Outreach, Pipeline, and Reference sections
 enum SourceSystem {
   SAM
   USASPENDING
@@ -110,20 +19,21 @@ enum SourceSystem {
   @@schema("public")
 }
 
-enum OrgLevel {
-  AGENCY
-  SUBAGENCY
-  OFFICE
-  OTHER
+// ─── USERS ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  READ_ONLY
+  USER
 
   @@schema("public")
 }
 
 model User {
-  id       String   @id @default(cuid())
-  clerkId  String   @unique
-  email    String   @unique
-  name     String?
+  id            String   @id @default(cuid())
+  clerkId       String   @unique
+  email         String   @unique
+  name          String?
   role          UserRole @default(USER)
   isActive      Boolean  @default(true)
   imageUrl      String?
@@ -137,6 +47,22 @@ model User {
   contactInteractions ContactInteraction[]
   inboxItemNotes      InboxItemNote[]
 
+  @@schema("public")
+}
+
+model Favorite {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  awardId       String?
+  award         Award?       @relation(fields: [awardId], references: [id], onDelete: Cascade)
+  createdAt     DateTime     @default(now())
+
+  @@unique([userId, opportunityId])
+  @@unique([userId, awardId])
+  @@index([userId])
   @@schema("public")
 }
 
@@ -170,107 +96,33 @@ model ChatMessage {
   @@schema("chat")
 }
 
-model Contact {
-  id String @id @default(cuid())
+// ─── FETCHED DATA ─────────────────────────────────────────────────────────────
 
-  fullName String?
-  email    String? @unique
-  phone    String?
-  title    String?
+enum Type {
+  PRE_SOLICITATION
+  AWARD_NOTICE
+  SOURCES_SOUGHT
+  SPECIAL_NOTICE
+  SOLICITATION
+  OTHER
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  links        ContactLink[]
-  interactions ContactInteraction[]
-
-  @@index([email])
-  @@index([phone])
   @@schema("public")
 }
 
-model ContactLink {
-  id String @id @default(cuid())
+enum OppTag {
+  INDUSTRY_DAY
+  GENERAL
 
-  contactId String
-  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
-
-  type   ContactType  @default(OTHER)
-  source SourceSystem @default(SAM)
-
-  // Dedupe key from source payload (scoped to the parent record)
-  externalId String
-
-  // Parent pointers (only ONE should be set per row)
-  opportunityId String?
-  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
-
-  industryDayId String?
-  industryDay   IndustryDay? @relation(fields: [industryDayId], references: [id], onDelete: Cascade)
-
-  inboxItemId String?
-  inboxItem   InboxItem? @relation(fields: [inboxItemId], references: [id], onDelete: Cascade)
-
-  buyingOrganizationId String?
-  buyingOrganization   BuyingOrganization? @relation(fields: [buyingOrganizationId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Scoped uniqueness so the same externalId can exist under different parents
-  @@unique([opportunityId, externalId])
-  @@unique([industryDayId, externalId])
-  @@unique([inboxItemId, externalId])
-  @@unique([buyingOrganizationId, externalId])
-  @@index([opportunityId])
-  @@index([industryDayId])
-  @@index([inboxItemId])
-  @@index([buyingOrganizationId])
   @@schema("public")
 }
 
-model BuyingOrganization {
-  id      String  @id @default(cuid())
-  name    String  @unique
-  website String?
+enum IndustryDayStatus {
+  OPEN
+  NOT_ATTENDING
+  ATTENDING
+  ATTENDED
+  PAST_EVENT
 
-  level    OrgLevel             @default(OTHER)
-  parentId String?
-  parent   BuyingOrganization?  @relation("BuyingOrgTree", fields: [parentId], references: [id], onDelete: SetNull)
-  children BuyingOrganization[] @relation("BuyingOrgTree")
-
-  externalId String? // Office/org identifier or code
-  pathName   String? // cached full path for fast display
-
-  contactLinks  ContactLink[]
-  inboxItems    InboxItem[]
-  awards        Award[]
-  industryDay   IndustryDay[]
-  opportunities Opportunity[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([name])
-  @@index([parentId])
-  @@index([level])
-  @@index([name, externalId])
-  @@schema("public")
-}
-
-model Recipient {
-  id      String  @id @default(cuid())
-  name    String
-  website String?
-  uei     String? @unique
-
-  awards Award[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([name])
-  @@index([uei])
   @@schema("public")
 }
 
@@ -438,26 +290,233 @@ model IndustryDay {
   @@schema("public")
 }
 
-model AppConfig {
-  key       String   @id
-  values    String[]
-  updatedAt DateTime @updatedAt
+// ─── REFERENCE ────────────────────────────────────────────────────────────────
+
+enum OrgLevel {
+  AGENCY
+  SUBAGENCY
+  OFFICE
+  OTHER
 
   @@schema("public")
 }
 
-model SyncLog {
-  id              String     @id @default(cuid())
-  jobId           String
-  jobName         String
-  startedAt       DateTime   @default(now())
-  completedAt     DateTime?
-  status          SyncStatus @default(RUNNING)
-  recordsAffected Int?
-  errorMessage    String?
+model BuyingOrganization {
+  id      String  @id @default(cuid())
+  name    String  @unique
+  website String?
 
-  @@index([jobId])
-  @@index([startedAt])
+  level    OrgLevel             @default(OTHER)
+  parentId String?
+  parent   BuyingOrganization?  @relation("BuyingOrgTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children BuyingOrganization[] @relation("BuyingOrgTree")
+
+  externalId String? // Office/org identifier or code
+  pathName   String? // cached full path for fast display
+
+  contactLinks  ContactLink[]
+  inboxItems    InboxItem[]
+  awards        Award[]
+  industryDay   IndustryDay[]
+  opportunities Opportunity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@index([parentId])
+  @@index([level])
+  @@index([name, externalId])
+  @@schema("public")
+}
+
+model Recipient {
+  id      String  @id @default(cuid())
+  name    String
+  website String?
+  uei     String? @unique
+
+  awards Award[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@index([uei])
+  @@schema("public")
+}
+
+model PscClass {
+  psc              String  @id // 4-digit PSC code (e.g., "8925")
+  title            String // e.g., "SUGAR, CONFECTIONERY, AND NUTS"
+  inclusions       String?
+  exclusions       String?
+  notes            String?
+  isSupplyTigerPsc Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stockNumbers         FederalLogisticsInformationSystem[]
+  commercialItemDescs  CommercialItemDesc[]
+
+  @@index([isSupplyTigerPsc])
+  @@schema("public")
+}
+
+model FederalLogisticsInformationSystem {
+  id              String   @id @default(cuid())
+  nsn             String   @unique // pscCode + niin (13 chars)
+  niin            String // 9-digit NIIN
+  pscCode         String
+  pscClass        PscClass @relation(fields: [pscCode], references: [psc], onDelete: Cascade)
+  itemName        String
+  characteristics String?
+  commonName      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([pscCode])
+  @@index([itemName])
+  @@index([commonName])
+  @@schema("public")
+}
+
+model CommercialItemDesc {
+  id          String   @id @default(cuid())
+  cid         String   @unique // e.g., "A-A-20177G"
+  date        String? // Date string(s) — variable format from source
+  description String
+  qaPkg       String?
+  qaPkgDate   String?
+  pscCode     String
+  pscClass    PscClass @relation(fields: [pscCode], references: [psc], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([pscCode])
+  @@schema("public")
+}
+
+// ─── OUTREACH ─────────────────────────────────────────────────────────────────
+
+enum ContactType {
+  PRIMARY
+  SECONDARY
+  OTHER
+
+  @@schema("public")
+}
+
+enum OutreachStatus {
+  SENT
+  RESPONDED
+  NO_REPLY
+  FOLLOW_UP
+  MEETING_SCHEDULED
+  CLOSED
+
+  @@schema("public")
+}
+
+model Contact {
+  id String @id @default(cuid())
+
+  fullName String?
+  email    String? @unique
+  phone    String?
+  title    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  links        ContactLink[]
+  interactions ContactInteraction[]
+
+  @@index([email])
+  @@index([phone])
+  @@schema("public")
+}
+
+model ContactLink {
+  id String @id @default(cuid())
+
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  type   ContactType  @default(OTHER)
+  source SourceSystem @default(SAM)
+
+  // Dedupe key from source payload (scoped to the parent record)
+  externalId String
+
+  // Parent pointers (only ONE should be set per row)
+  opportunityId String?
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  industryDayId String?
+  industryDay   IndustryDay? @relation(fields: [industryDayId], references: [id], onDelete: Cascade)
+
+  inboxItemId String?
+  inboxItem   InboxItem? @relation(fields: [inboxItemId], references: [id], onDelete: Cascade)
+
+  buyingOrganizationId String?
+  buyingOrganization   BuyingOrganization? @relation(fields: [buyingOrganizationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Scoped uniqueness so the same externalId can exist under different parents
+  @@unique([opportunityId, externalId])
+  @@unique([industryDayId, externalId])
+  @@unique([inboxItemId, externalId])
+  @@unique([buyingOrganizationId, externalId])
+  @@index([opportunityId])
+  @@index([industryDayId])
+  @@index([inboxItemId])
+  @@index([buyingOrganizationId])
+  @@schema("public")
+}
+
+model ContactInteraction {
+  id String @id @default(cuid())
+
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  status OutreachStatus
+  note   String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  loggedAt DateTime @default(now())
+
+  @@index([contactId, loggedAt])
+  @@schema("public")
+}
+
+// ─── PIPELINE ─────────────────────────────────────────────────────────────────
+
+enum AcquisitionPath {
+  MICROPURCHASE
+  GSA
+  OPEN_MARKET
+  SUBCONTRACTING
+
+  @@schema("public")
+}
+
+enum InboxStatus {
+  NEW
+  IN_REVIEW
+  QUALIFIED
+  DISMISSED
+  CONTACTED
+  CLOSED
+
   @@schema("public")
 }
 
@@ -509,124 +568,78 @@ model InboxItem {
   @@schema("public")
 }
 
-model Favorite {
-  id            String       @id @default(cuid())
-  userId        String
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  opportunityId String?
-  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
-  awardId       String?
-  award         Award?       @relation(fields: [awardId], references: [id], onDelete: Cascade)
-  createdAt     DateTime     @default(now())
-
-  @@unique([userId, opportunityId])
-  @@unique([userId, awardId])
-  @@index([userId])
-  @@schema("public")
-}
-
-model PscClass {
-  psc              String  @id // 4-digit PSC code (e.g., "8925")
-  title            String // e.g., "SUGAR, CONFECTIONERY, AND NUTS"
-  inclusions       String?
-  exclusions       String?
-  notes            String?
-  isSupplyTigerPsc Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  stockNumbers         FederalLogisticsInformationSystem[]
-  commercialItemDescs  CommercialItemDesc[]
-
-  @@index([isSupplyTigerPsc])
-  @@schema("public")
-}
-
-model FederalLogisticsInformationSystem {
-  id              String  @id @default(cuid())
-  nsn             String  @unique // pscCode + niin (13 chars)
-  niin            String // 9-digit NIIN
-  pscCode         String
-  pscClass        PscClass @relation(fields: [pscCode], references: [psc], onDelete: Cascade)
-  itemName        String
-  characteristics String?
-  commonName      String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([pscCode])
-  @@index([itemName])
-  @@index([commonName])
-  @@schema("public")
-}
-
-model ContactInteraction {
-  id        String         @id @default(cuid())
-
-  contactId String
-  contact   Contact        @relation(fields: [contactId], references: [id], onDelete: Cascade)
-
-  status    OutreachStatus
-  note      String?
-
-  userId    String
-  user      User           @relation(fields: [userId], references: [id], onDelete: Restrict)
-
-  loggedAt  DateTime       @default(now())
-
-  @@index([contactId, loggedAt])
-  @@schema("public")
-}
-
 model InboxItemNote {
-  id          String    @id @default(cuid())
+  id String @id @default(cuid())
 
   inboxItemId String
   inboxItem   InboxItem @relation(fields: [inboxItemId], references: [id], onDelete: Cascade)
 
-  text      String
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  text   String
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
 
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([inboxItemId, createdAt])
   @@schema("public")
 }
 
-model CommercialItemDesc {
-  id          String  @id @default(cuid())
-  cid         String  @unique // e.g., "A-A-20177G"
-  date        String? // Date string(s) — variable format from source
-  description String
-  qaPkg       String?
-  qaPkgDate   String?
-  pscCode     String
-  pscClass    PscClass @relation(fields: [pscCode], references: [psc], onDelete: Cascade)
+// ─── SYSTEM ───────────────────────────────────────────────────────────────────
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum SyncStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
 
-  @@index([pscCode])
+  @@schema("public")
+}
+
+enum ScoringQueueStatus {
+  PENDING
+  APPROVED
+  DISMISSED
+
   @@schema("public")
 }
 
 model ScoringQueue {
-  id            String             @id @default(cuid())
-  opportunityId String             @unique
-  opportunity   Opportunity        @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
-  score         Int
+  id             String             @id @default(cuid())
+  opportunityId  String             @unique
+  opportunity    Opportunity        @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  score          Int
   matchedSignals Json              // Array of { type, value, source } objects
-  status        ScoringQueueStatus @default(PENDING)
-  reviewedBy    String?
-  reviewedAt    DateTime?
-  expiresAt     DateTime           // set to min(createdAt+14d, opportunity.responseDeadline)
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  status         ScoringQueueStatus @default(PENDING)
+  reviewedBy     String?
+  reviewedAt     DateTime?
+  expiresAt      DateTime           // set to min(createdAt+14d, opportunity.responseDeadline)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 
   @@index([status])
   @@index([expiresAt])
+  @@schema("public")
+}
+
+model SyncLog {
+  id              String     @id @default(cuid())
+  jobId           String
+  jobName         String
+  startedAt       DateTime   @default(now())
+  completedAt     DateTime?
+  status          SyncStatus @default(RUNNING)
+  recordsAffected Int?
+  errorMessage    String?
+
+  @@index([jobId])
+  @@index([startedAt])
+  @@schema("public")
+}
+
+model AppConfig {
+  key       String   @id
+  values    String[]
+  updatedAt DateTime @updatedAt
+
   @@schema("public")
 }
