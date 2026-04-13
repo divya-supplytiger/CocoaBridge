@@ -139,6 +139,8 @@ const KNOWN_JOBS = [
   { jobId: "backfill-inbox-item-scores", jobName: "Backfill Inbox Item Scores" },
   { jobId: "backfill-award-inbox-scores", jobName: "Backfill Award Inbox Scores" },
   { jobId: "send-daily-digest", jobName: "Send Daily Digest Email" },
+  { jobId: "cleanup-expired-parsed-docs", jobName: "Cleanup Expired Parsed Docs" },
+  { jobId: "cleanup-orphaned-contacts", jobName: "Cleanup Orphaned Contacts" },
 ];
 
 export const getSystemHealth = async (req, res) => {
@@ -307,6 +309,36 @@ const SYNC_JOBS = {
     },
     countFn: (r) => r?.sent ?? null,
   },
+  "cleanup-db": {
+    jobId: "cleanup-expired-parsed-docs",
+    jobName: "Cleanup Expired Parsed Docs",
+    fn: async () => {
+      const cutoff = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000);
+      const { count } = await prisma.opportunityAttachment.updateMany({
+        where: {
+          parsedText: { not: null },
+          opportunity: { active: false, responseDeadline: { lt: cutoff } },
+        },
+        data: { parsedText: null, parsedAt: null },
+      });
+      return { clearedCount: count };
+    },
+    countFn: (r) => r?.clearedCount ?? null,
+  },
+  "cleanup-orphaned-contacts": {
+    jobId: "cleanup-orphaned-contacts",
+    jobName: "Cleanup Orphaned Contacts",
+    fn: async () => {
+      const { count } = await prisma.contact.deleteMany({
+        where: {
+          links: { none: { opportunityId: { not: null } } },
+          interactions: { none: {} },
+        },
+      });
+      return { deletedCount: count };
+    },
+    countFn: (r) => r?.deletedCount ?? null,
+  },
 };
 
 export const triggerSync = async (req, res) => {
@@ -331,6 +363,50 @@ export const triggerSync = async (req, res) => {
     return res.status(500).json({
       message: `Sync failed: ${error.message ?? "Unknown error"}`,
     });
+  }
+};
+
+// ─── Cleanup DB Preview ───────────────────────────────────────────────────────
+
+export const getCleanupDbPreview = async (req, res) => {
+  try {
+    const cutoff = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000);
+    const [attachmentCount, opportunityCount] = await Promise.all([
+      prisma.opportunityAttachment.count({
+        where: {
+          parsedText: { not: null },
+          opportunity: { active: false, responseDeadline: { lt: cutoff } },
+        },
+      }),
+      prisma.opportunity.count({
+        where: {
+          active: false,
+          responseDeadline: { lt: cutoff },
+          attachments: { some: { parsedText: { not: null } } },
+        },
+      }),
+    ]);
+    return res.status(200).json({ opportunityCount, attachmentCount });
+  } catch (error) {
+    console.error("Error fetching cleanup preview:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// ─── Cleanup Orphaned Contacts Preview ───────────────────────────────────────
+
+export const getCleanupOrphanedContactsPreview = async (req, res) => {
+  try {
+    const contactCount = await prisma.contact.count({
+      where: {
+        links: { none: { opportunityId: { not: null } } },
+        interactions: { none: {} },
+      },
+    });
+    return res.status(200).json({ contactCount });
+  } catch (error) {
+    console.error("Error fetching orphaned contacts preview:", error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
 

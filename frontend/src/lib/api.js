@@ -297,4 +297,14 @@ export const adminApi = {
     const { data } = await axiosInstance.put(`/admin/config/${key}`, { values });
     return data;
   },
+  // Cleanup DB preview — returns { opportunityCount, attachmentCount }
+  cleanupDbPreview: async () => {
+    const { data } = await axiosInstance.get("/admin/cleanup-db/preview");
+    return data;
+  },
+  // Cleanup Orphaned Contacts preview — returns { contactCount }
+  cleanupOrphanedContactsPreview: async () => {
+    const { data } = await axiosInstance.get("/admin/cleanup-orphaned-contacts/preview");
+    return data;
+  },
 };

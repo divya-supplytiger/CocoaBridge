@@ -32,6 +32,38 @@ const SYNC_JOBS = [
   { type: "backfill-award-inbox-scores", label: "Backfill Award Inbox Scores", description: "Score award-linked inbox items that have no score yet. Uses NAICS/PSC/keyword/micropurchase signals. Does not delete items below threshold." },
   { type: "cleanup-chats", label: "Cleanup Expired Chats", description: "Delete chat conversations that have passed their retention expiry date." },
   { type: "send-daily-digest", label: "Send Daily Digest", description: "Send today's digest email immediately to all active users with digest enabled. Use for testing." },
+  {
+    type: "cleanup-db",
+    label: "Cleanup Expired Parsed Docs",
+    description: "Clear stored parsed text from attachments on inactive opportunities older than 21 days. Frees database storage without deleting opportunity or inbox item records.",
+    requiresConfirm: true,
+    confirmLabel: "Clear",
+    previewFn: () => adminApi.cleanupDbPreview(),
+    getConfirmMessage: (preview) => (
+      <>
+        This will clear parsed text from{" "}
+        <strong>{preview.attachmentCount} attachment(s)</strong> across{" "}
+        <strong>{preview.opportunityCount} opportunity record(s)</strong>.
+        {" "}Opportunity records, inbox items, and notes will not be deleted.
+        This cannot be undone.
+      </>
+    ),
+  },
+  {
+    type: "cleanup-orphaned-contacts",
+    label: "Cleanup Orphaned Contacts",
+    description: "Delete contacts with no linked opportunities and no outreach history. Contacts with logged interactions are preserved.",
+    requiresConfirm: true,
+    confirmLabel: "Delete",
+    previewFn: () => adminApi.cleanupOrphanedContactsPreview(),
+    getConfirmMessage: (preview) => (
+      <>
+        This will permanently delete{" "}
+        <strong>{preview.contactCount} contact(s)</strong> with no linked
+        opportunities or outreach history. This cannot be undone.
+      </>
+    ),
+  },
 ];
 
 const ADMIN_TABS = [
@@ -176,6 +208,8 @@ const UserManagement = () => {
 
 const SyncControls = () => {
   const queryClient = useQueryClient();
+  const [confirmJob, setConfirmJob] = useState(null); // { type, label, preview }
+  const [previewLoadingType, setPreviewLoadingType] = useState(null); // tracks which job type is loading
 
   const mutations = Object.fromEntries(
     SYNC_JOBS.map(({ type }) => [
@@ -201,6 +235,18 @@ const SyncControls = () => {
     ])
   );
 
+  const handleConfirmJobClick = async (type, label, previewFn) => {
+    setPreviewLoadingType(type);
+    try {
+      const preview = await previewFn();
+      setConfirmJob({ type, label, preview });
+    } catch {
+      toast.error("Failed to fetch preview");
+    } finally {
+      setPreviewLoadingType(null);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1 text-sm opacity-60">
@@ -217,16 +263,17 @@ const SyncControls = () => {
         <p className="mt-1">Cleanup and backfill jobs can run at any time.</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {SYNC_JOBS.map(({ type, label, description }) => {
+      {SYNC_JOBS.map(({ type, label, description, requiresConfirm, previewFn }) => {
         const mutation = mutations[type];
+        const isThisPreviewLoading = previewLoadingType === type;
         return (
           <div key={type} className="flex flex-col gap-1.5 p-3 rounded-lg bg-accent-content/10">
             <button
               className="btn btn-sm gap-2 bg-accent-content/10 hover:bg-accent-content/20 border-0 text-accent-content text-md self-start"
-              onClick={() => mutation.mutate()}
-              disabled={mutation.isPending}
+              onClick={() => requiresConfirm ? handleConfirmJobClick(type, label, previewFn) : mutation.mutate()}
+              disabled={mutation.isPending || isThisPreviewLoading}
             >
-              {mutation.isPending ? (
+              {(mutation.isPending || isThisPreviewLoading) ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
                 <RefreshCw className="size-4" />
@@ -238,6 +285,26 @@ const SyncControls = () => {
         );
       })}
       </div>
+
+      {(() => {
+        const currentJob = SYNC_JOBS.find(j => j.type === confirmJob?.type);
+        return (
+          <ConfirmModal
+            open={!!confirmJob}
+            onClose={() => setConfirmJob(null)}
+            isPending={confirmJob ? mutations[confirmJob.type]?.isPending : false}
+            onConfirm={() => {
+              if (!confirmJob) return;
+              mutations[confirmJob.type].mutate();
+              setConfirmJob(null);
+            }}
+            title={confirmJob?.label ?? ""}
+            confirmLabel={currentJob?.confirmLabel ?? "Confirm"}
+          >
+            {confirmJob?.preview && currentJob?.getConfirmMessage(confirmJob.preview)}
+          </ConfirmModal>
+        );
+      })()}
     </div>
   );
 }
