@@ -26,14 +26,16 @@ After adding the variables, **redeploy** the MCP server (Vercel → Deployments 
 
 ## Step 2 — Add the MCP server to ChatGPT
 
-1. Go to [chat.openai.com](https://chat.openai.com) and open **Settings**
-2. Navigate to **Connectors** (or **Connected Apps** / **MCP Servers** depending on your plan)
-3. Click **Add MCP Server** (or similar)
-4. Enter your MCP server URL:
+1. Go to [chatgpt.com](https://chatgpt.com) and open **Settings**
+2. Navigate to **Apps**
+3. Click on **Advanced Settings** to enable developer mode
+4. Click **Create App** (or similar)
+5. Enter your MCP server URL:
    ```
    https://<your-mcp-vercel-url>
    ```
-5. ChatGPT will fetch `/.well-known/oauth-authorization-server` automatically
+6. Type 'chatgpt' into the 'Client ID' field
+7. ChatGPT will fetch `/.well-known/oauth-authorization-server` automatically
 
 ---
 
