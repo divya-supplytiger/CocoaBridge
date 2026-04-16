@@ -1,6 +1,8 @@
 # Connecting ChatGPT Web to the SupplyTiger MCP Server
 
-One-time setup guide. Takes ~5 minutes.
+One-time setup guide.
+
+**Note**: Currently only connectable if ChatGPT is in developer mode (memory doesn't persist). This is to protect data when connecting to unverified apps.
 
 ---
 
