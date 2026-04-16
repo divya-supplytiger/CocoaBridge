@@ -11,6 +11,7 @@
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
     "dotenv": "^16.6.1",
+    "jose": "^6.2.2",
     "pg": "^8.17.2",
     "prisma": "^7.3.0",
     "zod": "^3.24.0"
