@@ -24,7 +24,11 @@ async function readBody(req) {
     req.on("end", () => {
       const ct = req.headers["content-type"] ?? "";
       if (ct.includes("application/json")) {
-        try { resolve(JSON.parse(raw)); } catch { resolve({}); }
+        try {
+          resolve(JSON.parse(raw));
+        } catch {
+          resolve({});
+        }
       } else if (ct.includes("application/x-www-form-urlencoded")) {
         resolve(Object.fromEntries(new URLSearchParams(raw)));
       } else {
@@ -42,7 +46,7 @@ function setCors(res) {
 
 // ── OAuth route handlers ───────────────────────────────────────────────────
 
-function handleOAuthMetadata(req, res) {
+function handleOAuthMetadata(_req, res) {
   const baseUrl = ENV.MCP_SERVER_URL.replace(/\/$/, "");
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(JSON.stringify(oauthMetadata(baseUrl)));
@@ -54,7 +58,8 @@ function handleAuthorizeGet(req, res) {
   const redirectUri = url.searchParams.get("redirect_uri") ?? "";
   const state = url.searchParams.get("state") ?? "";
   const codeChallenge = url.searchParams.get("code_challenge") ?? "";
-  const codeChallengeMethod = url.searchParams.get("code_challenge_method") ?? "S256";
+  const codeChallengeMethod =
+    url.searchParams.get("code_challenge_method") ?? "S256";
 
   const client = findClient(clientId);
   if (!client) {
@@ -64,17 +69,31 @@ function handleAuthorizeGet(req, res) {
   }
   if (!redirectUri || !isValidRedirectUri(client, redirectUri)) {
     res.writeHead(400, { "Content-Type": "text/html" });
-    res.end(serveAuthorizePage({ error: "Invalid or disallowed redirect_uri." }));
+    res.end(
+      serveAuthorizePage({ error: "Invalid or disallowed redirect_uri." }),
+    );
     return;
   }
   if (codeChallengeMethod !== "S256") {
     res.writeHead(400, { "Content-Type": "text/html" });
-    res.end(serveAuthorizePage({ error: "Only code_challenge_method=S256 is supported." }));
+    res.end(
+      serveAuthorizePage({
+        error: "Only code_challenge_method=S256 is supported.",
+      }),
+    );
     return;
   }
 
   res.writeHead(200, { "Content-Type": "text/html" });
-  res.end(serveAuthorizePage({ clientId, redirectUri, state, codeChallenge, codeChallengeMethod }));
+  res.end(
+    serveAuthorizePage({
+      clientId,
+      redirectUri,
+      state,
+      codeChallenge,
+      codeChallengeMethod,
+    }),
+  );
 }
 
 async function handleAuthorizePost(req, res) {
@@ -91,7 +110,7 @@ async function handleAuthorizePost(req, res) {
     return;
   }
 
-  const code = generateAuthCode(clientId, redirectUri, codeChallenge);
+  const code = await generateAuthCode(clientId, redirectUri, codeChallenge);
   const callback = new URL(redirectUri);
   callback.searchParams.set("code", code);
   if (state) callback.searchParams.set("state", state);
@@ -102,14 +121,24 @@ async function handleAuthorizePost(req, res) {
 
 async function handleTokenRequest(req, res) {
   const body = await readBody(req);
-  const { grant_type, code, redirect_uri, client_id, client_secret, code_verifier } = body;
+  const {
+    grant_type,
+    code,
+    redirect_uri,
+    client_id,
+    client_secret,
+    code_verifier,
+  } = body;
 
   const fail = (msg) => {
     res.writeHead(400, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "invalid_request", error_description: msg }));
+    res.end(
+      JSON.stringify({ error: "invalid_request", error_description: msg }),
+    );
   };
 
-  if (grant_type !== "authorization_code") return fail("grant_type must be authorization_code");
+  if (grant_type !== "authorization_code")
+    return fail("grant_type must be authorization_code");
   if (!code) return fail("Missing code");
   if (!code_verifier) return fail("Missing code_verifier");
 
@@ -124,27 +153,28 @@ async function handleTokenRequest(req, res) {
   // Validate auth code
   let codePayload;
   try {
-    codePayload = verifyAuthCode(code);
+    codePayload = await verifyAuthCode(code);
   } catch (err) {
     return fail(`Invalid or expired code: ${err.message}`);
   }
 
   if (codePayload.clientId !== client_id) return fail("client_id mismatch");
-  if (codePayload.redirectUri !== redirect_uri) return fail("redirect_uri mismatch");
+  if (codePayload.redirectUri !== redirect_uri)
+    return fail("redirect_uri mismatch");
 
   // Verify PKCE
   if (!verifySHA256PKCE(code_verifier, codePayload.codeChallenge)) {
     return fail("PKCE verification failed");
   }
 
-  const accessToken = generateAccessToken(client_id);
+  const accessToken = await generateAccessToken(client_id);
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(
     JSON.stringify({
       access_token: accessToken,
       token_type: "bearer",
       expires_in: 365 * 24 * 60 * 60,
-    })
+    }),
   );
 }
 
@@ -161,7 +191,8 @@ export default async function handler(req, res) {
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, GET, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization, mcp-session-id",
+      "Access-Control-Allow-Headers":
+        "Content-Type, Authorization, mcp-session-id",
     });
     res.end();
     return;
@@ -171,7 +202,10 @@ export default async function handler(req, res) {
   const path = url.pathname;
 
   // ── OAuth endpoints (no MCP auth required) ──
-  if (req.method === "GET" && path === "/.well-known/oauth-authorization-server") {
+  if (
+    req.method === "GET" &&
+    path === "/.well-known/oauth-authorization-server"
+  ) {
     return handleOAuthMetadata(req, res);
   }
   if (req.method === "GET" && path === "/authorize") {
@@ -196,7 +230,7 @@ export default async function handler(req, res) {
       authorized = true; // legacy bearer — Claude Code
     } else if (token) {
       try {
-        verifyAccessToken(token);
+        await verifyAccessToken(token);
         authorized = true; // OAuth JWT — ChatGPT (and future clients)
       } catch {
         // invalid token — fall through to 401
